@@ -19,6 +19,70 @@ body {
   min-height: 100vh;
   background-color: #f9fafb; /* neutral-50 */
   color: #171717; /* neutral-900 */
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* Dark Mode Styles */
+html.dark body {
+  background-color: #171717; /* neutral-900 */
+  color: #f5f5f5; /* neutral-100 */
+}
+
+html.dark .bg-white {
+  background-color: #262626 !important; /* neutral-800 */
+  color: #f5f5f5 !important;
+}
+
+html.dark .bg-neutral-100, 
+html.dark .bg-neutral-50 {
+  background-color: #404040 !important; /* neutral-700 */
+}
+
+html.dark .border-neutral-200,
+html.dark .border-b, 
+html.dark .border-r,
+html.dark .border-x,
+html.dark .border {
+  border-color: #404040 !important;
+}
+
+html.dark textarea {
+  background-color: #262626 !important;
+  color: #f5f5f5 !important;
+}
+
+html.dark .text-neutral-500,
+html.dark .text-neutral-600,
+html.dark .text-neutral-400 {
+  color: #a3a3a3 !important; /* neutral-400 */
+}
+
+html.dark .text-neutral-700,
+html.dark .text-neutral-800,
+html.dark .text-neutral-900 {
+  color: #f5f5f5 !important;
+}
+
+html.dark .hover\:bg-neutral-100:hover {
+  background-color: #404040 !important;
+}
+
+/* Prose Dark Mode Override */
+html.dark .prose {
+  color: #d4d4d4 !important;
+}
+html.dark .prose h1, html.dark .prose h2, html.dark .prose h3, html.dark .prose h4, html.dark .prose strong {
+  color: #f5f5f5 !important;
+}
+html.dark .prose a {
+  color: #60a5fa !important; /* blue-400 */
+}
+html.dark .prose code {
+  color: #f5f5f5 !important;
+  background-color: #404040 !important;
+}
+html.dark .prose pre {
+  background-color: #171717 !important;
 }
 
 #root {
@@ -40,6 +104,7 @@ body {
   
   body, #root, main, .preview-pane {
     background: white !important;
+    color: black !important;
     height: auto !important;
     overflow: visible !important;
     display: block !important;
@@ -52,5 +117,12 @@ body {
   
   .prose {
     max-width: 100% !important;
+    color: black !important;
+  }
+  
+  /* Reset Dark Mode for Print */
+  html.dark body {
+    background-color: white !important;
+    color: black !important;
   }
 }
