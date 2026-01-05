@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import mermaid from 'mermaid';
 import { 
   FileDown, Layout, Eye, Code, LogIn, LogOut, Loader2,
   Bold, Italic, Heading1, Heading2, Heading3, List, ListOrdered, CheckSquare, Link, Code2, Network,
-  Strikethrough, Quote, Minus, Table, Image, Printer, ExternalLink, X, FilePlus, Moon, Sun, Download
+  Strikethrough, Quote, Minus, Table, Image, Printer, ExternalLink, X, FilePlus, Moon, Sun, Download,
+  Copy, Check
 } from 'lucide-react';
 import { revokeToken } from './utils/googleClient';
 import { exportMarkdownToDocs } from './utils/exportToDocs';
@@ -73,10 +74,45 @@ graph TD
 - **Preview trực tiếp**: Nhìn thấy kết quả ngay lập tức
 `;
 
+const CodeBlock = ({ children, className, ...rest }: any) => {
+  const [copied, setCopied] = useState(false);
+  const code = String(children).replace(/\n$/, '');
+  const isInline = !className;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (isInline) {
+    return <code className={className} {...rest}>{children}</code>;
+  }
+
+  return (
+    <div className="relative group">
+      <button
+        onClick={handleCopy}
+        className="absolute right-2 top-2 p-1.5 rounded-md bg-neutral-800/10 hover:bg-neutral-800/20 dark:bg-white/10 dark:hover:bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"
+        title="Copy code"
+      >
+        {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} className="text-neutral-500" />}
+      </button>
+      <pre className="!mt-0 !mb-0 overflow-auto">
+        <code className={className} {...rest}>
+          {children}
+        </code>
+      </pre>
+    </div>
+  );
+};
+
 function App() {
   const [markdown, setMarkdown] = useState(DEFAULT_MD);
   const [view, setView] = useState<'split' | 'edit' | 'preview'>('split');
   const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+  const [editorWidth, setEditorWidth] = useState(50);
+  const [isResizing, setIsResizing] = useState(false);
   
   const apiKey = import.meta.env.VITE_GOOGLE_API_KEY || localStorage.getItem('GOOGLE_API_KEY') || '';
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || localStorage.getItem('GOOGLE_CLIENT_ID') || '';
@@ -91,6 +127,7 @@ function App() {
   const [showNewFileConfirm, setShowNewFileConfirm] = useState(false);
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (darkMode) {
@@ -101,6 +138,33 @@ function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [darkMode]);
+
+  const startResizing = useCallback(() => {
+    setIsResizing(true);
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = useCallback((mouseMoveEvent: MouseEvent) => {
+    if (isResizing && mainRef.current) {
+      const mainRect = mainRef.current.getBoundingClientRect();
+      const newWidth = ((mouseMoveEvent.clientX - mainRect.left) / mainRect.width) * 100;
+      if (newWidth >= 20 && newWidth <= 80) {
+        setEditorWidth(newWidth);
+      }
+    }
+  }, [isResizing]);
+
+  useEffect(() => {
+    window.addEventListener("mousemove", resize);
+    window.addEventListener("mouseup", stopResizing);
+    return () => {
+      window.removeEventListener("mousemove", resize);
+      window.removeEventListener("mouseup", stopResizing);
+    };
+  }, [resize, stopResizing]);
 
   useEffect(() => {
     if (apiKey && clientId && !isInitialized) {
@@ -341,9 +405,12 @@ function App() {
         </div>
       </header>
 
-      <main className="flex-1 flex overflow-hidden">
+      <main ref={mainRef} className="flex-1 flex overflow-hidden" style={{ userSelect: isResizing ? 'none' : 'auto' }}>
         {(view === 'split' || view === 'edit') && (
-          <div className={`editor-pane flex-1 border-r bg-white flex flex-col ${view === 'edit' ? 'max-w-5xl mx-auto border-x' : ''}`}>
+          <div 
+            className={`editor-pane border-r bg-white flex flex-col ${view !== 'split' ? 'flex-1' : ''} ${view === 'edit' ? 'max-w-5xl mx-auto border-x' : ''}`}
+            style={view === 'split' ? { width: `${editorWidth}%`, flex: 'none' } : {}}
+          >
              {/* Toolbar */}
              <div className="toolbar h-10 border-b flex items-center px-4 gap-1 bg-white sticky top-0 overflow-x-auto transition-colors duration-300">
                <ToolbarButton icon={FilePlus} onClick={handleNewFile} title="New File" />
@@ -386,6 +453,13 @@ function App() {
           </div>
         )}
 
+        {view === 'split' && (
+          <div
+            className="w-1 bg-neutral-200 hover:bg-blue-400 cursor-col-resize transition-colors z-10 flex-shrink-0"
+            onMouseDown={startResizing}
+          />
+        )}
+
         {(view === 'split' || view === 'preview') && (
           <div className={`preview-pane flex-1 overflow-y-auto bg-neutral-50 ${view === 'preview' ? 'max-w-5xl mx-auto' : ''}`}>
             <div className="p-10 prose prose-neutral max-w-none bg-white min-h-full shadow-sm text-neutral-800">
@@ -395,13 +469,10 @@ function App() {
                   code(props: any) {
                     const { children, className, node, ...rest } = props;
                     const match = /mermaid/i.test(className || '');
-                    return match ? (
-                      <Mermaid chart={String(children).replace(/\n$/, '')} />
-                    ) : (
-                      <code className={className} {...rest}>
-                        {children}
-                      </code>
-                    );
+                    if (match) {
+                      return <Mermaid chart={String(children).replace(/\n$/, '')} />;
+                    }
+                    return <CodeBlock className={className} {...rest}>{children}</CodeBlock>;
                   },
                   table(props: any) {
                     return (
