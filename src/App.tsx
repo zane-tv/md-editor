@@ -374,6 +374,13 @@ function App() {
                         {children}
                       </code>
                     );
+                  },
+                  table(props: any) {
+                    return (
+                      <div className="table-wrapper my-4 inline-block border rounded overflow-hidden">
+                        <table {...props} />
+                      </div>
+                    );
                   }
                 }}
               >
