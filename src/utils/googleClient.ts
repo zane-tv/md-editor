@@ -54,6 +54,11 @@ export const initTokenClient = (clientId: string, callback: (tokenResponse: any)
   });
 };
 
+export const restoreToken = (token: any) => {
+    // @ts-ignore
+    gapi.client.setToken(token);
+};
+
 export const revokeToken = (token: string) => {
   // @ts-ignore
   google.accounts.oauth2.revoke(token, () => {

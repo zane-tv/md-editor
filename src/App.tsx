@@ -104,13 +104,37 @@ function App() {
 
   useEffect(() => {
     if (apiKey && clientId && !isInitialized) {
-      import('./utils/googleClient').then(async ({ initGoogleClient, initTokenClient }) => {
+      import('./utils/googleClient').then(async ({ initGoogleClient, initTokenClient, restoreToken }) => {
         try {
           await initGoogleClient(apiKey);
           console.log("GAPI Client Initialized");
+          
+          // Check for saved token
+          const savedToken = localStorage.getItem('google_access_token');
+          const savedExpiry = localStorage.getItem('google_token_expiry');
+          
+          if (savedToken && savedExpiry) {
+            if (Date.now() < parseInt(savedExpiry)) {
+               console.log("Restoring saved token");
+               restoreToken({ access_token: savedToken });
+               setAccessToken(savedToken);
+            } else {
+               console.log("Saved token expired");
+               localStorage.removeItem('google_access_token');
+               localStorage.removeItem('google_token_expiry');
+            }
+          }
+
           const client = initTokenClient(clientId, (tokenResponse) => {
              console.log("Token received");
              setAccessToken(tokenResponse.access_token);
+             
+             // Save token
+             if (tokenResponse.expires_in) {
+                 const expiry = Date.now() + (tokenResponse.expires_in * 1000);
+                 localStorage.setItem('google_access_token', tokenResponse.access_token);
+                 localStorage.setItem('google_token_expiry', expiry.toString());
+             }
           });
           setTokenClient(client);
           setIsInitialized(true);
@@ -134,6 +158,8 @@ function App() {
     if (accessToken) {
       revokeToken(accessToken);
       setAccessToken(null);
+      localStorage.removeItem('google_access_token');
+      localStorage.removeItem('google_token_expiry');
       setStatusMsg("Logged out");
       setTimeout(() => setStatusMsg(''), 3000);
     }
@@ -174,6 +200,8 @@ function App() {
       setStatusMsg(`Export failed: ${error.message}`);
       if (error.message && (error.message.includes('401') || error.message.includes('403'))) {
          setAccessToken(null);
+         localStorage.removeItem('google_access_token');
+         localStorage.removeItem('google_token_expiry');
          setStatusMsg("Token expired. Please Sign In again.");
       }
     } finally {
