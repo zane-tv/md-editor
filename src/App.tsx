@@ -48,8 +48,13 @@ mermaid.initialize({
   fontFamily: "Inter, sans-serif",
 });
 
-const Mermaid = ({ chart }: { chart: string }) => {
+const Mermaid = ({ chart, darkMode }: { chart: string; darkMode: boolean }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const themeDirective = `%%{init: {'theme': '${
+    darkMode ? "dark" : "default"
+  }'} }%%\n`;
+  const chartWithTheme = themeDirective + chart;
 
   useEffect(() => {
     if (!chart || !containerRef.current) return;
@@ -61,7 +66,7 @@ const Mermaid = ({ chart }: { chart: string }) => {
         if (containerRef.current)
           containerRef.current.innerHTML =
             '<div class="animate-pulse text-xs text-neutral-400">Rendering...</div>';
-        const { svg } = await mermaid.render(id, chart);
+        const { svg } = await mermaid.render(id, chartWithTheme);
         if (containerRef.current) containerRef.current.innerHTML = svg;
       } catch (error: any) {
         console.error("Mermaid Failed:", error);
@@ -79,7 +84,7 @@ const Mermaid = ({ chart }: { chart: string }) => {
     };
 
     render();
-  }, [chart]);
+  }, [chartWithTheme]);
 
   return (
     <div
@@ -863,7 +868,10 @@ function App() {
                     const match = /mermaid/i.test(className || "");
                     if (match) {
                       return (
-                        <Mermaid chart={String(children).replace(/\n$/, "")} />
+                        <Mermaid
+                          chart={String(children).replace(/\n$/, "")}
+                          darkMode={darkMode}
+                        />
                       );
                     }
                     return (
