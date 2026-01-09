@@ -39,6 +39,8 @@ import {
 } from "lucide-react";
 import { revokeToken } from "./utils/googleClient";
 import { exportMarkdownToDocs } from "./utils/exportToDocs";
+import { TableOfContents } from "./components/TableOfContents";
+import { getTextFromChildren, slugify } from "./utils/slugify";
 
 // Initialize mermaid
 mermaid.initialize({
@@ -852,45 +854,71 @@ function App() {
         )}
 
         {(view === "split" || view === "preview") && (
-          <div
-            ref={previewRef}
-            onScroll={handlePreviewScroll}
-            className={`preview-pane flex-1 overflow-y-auto bg-neutral-50 ${
-              view === "preview" ? "max-w-5xl mx-auto" : ""
-            }`}
-          >
-            <div className="p-10 prose prose-neutral max-w-none bg-white min-h-full shadow-sm text-neutral-800">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  code(props: any) {
-                    const { children, className, node, ...rest } = props;
-                    const match = /mermaid/i.test(className || "");
-                    if (match) {
+          <div className={`flex flex-1 overflow-hidden h-full relative ${view === "preview" ? "bg-neutral-100 dark:bg-neutral-900" : ""}`}>
+            {/* TOC Sidebar - Only in Preview Mode */}
+            {view === 'preview' && (
+              <div className="w-72 bg-neutral-50 dark:bg-neutral-900 border-r dark:border-neutral-700 overflow-y-auto hidden lg:block flex-shrink-0 h-full">
+                 <TableOfContents markdown={markdown} />
+              </div>
+            )}
+
+            {/* Preview Content */}
+            <div
+              ref={previewRef}
+              onScroll={handlePreviewScroll}
+              className={`preview-pane flex-1 overflow-y-auto bg-neutral-50 dark:bg-neutral-900`}
+            >
+              <div className={`prose prose-neutral max-w-none bg-white dark:bg-neutral-800 min-h-full shadow-sm text-neutral-800 dark:text-neutral-100 ${
+                 view === "preview" ? "max-w-4xl mx-auto my-8 p-10 rounded-lg border dark:border-neutral-700" : "p-10"
+              }`}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    h1: ({ children, ...props }) => {
+                       const id = slugify(getTextFromChildren(children));
+                       return <h1 id={id} {...props}>{children}</h1>;
+                    },
+                    h2: ({ children, ...props }) => {
+                       const id = slugify(getTextFromChildren(children));
+                       return <h2 id={id} {...props}>{children}</h2>;
+                    },
+                    h3: ({ children, ...props }) => {
+                       const id = slugify(getTextFromChildren(children));
+                       return <h3 id={id} {...props}>{children}</h3>;
+                    },
+                    h4: ({ children, ...props }) => {
+                       const id = slugify(getTextFromChildren(children));
+                       return <h4 id={id} {...props}>{children}</h4>;
+                    },
+                    code(props: any) {
+                      const { children, className, node, ...rest } = props;
+                      const match = /mermaid/i.test(className || "");
+                      if (match) {
+                        return (
+                          <Mermaid
+                            chart={String(children).replace(/\n$/, "")}
+                            darkMode={darkMode}
+                          />
+                        );
+                      }
                       return (
-                        <Mermaid
-                          chart={String(children).replace(/\n$/, "")}
-                          darkMode={darkMode}
-                        />
+                        <CodeBlock className={className} {...rest}>
+                          {children}
+                        </CodeBlock>
                       );
-                    }
-                    return (
-                      <CodeBlock className={className} {...rest}>
-                        {children}
-                      </CodeBlock>
-                    );
-                  },
-                  table(props: any) {
-                    return (
-                      <div className="table-wrapper my-4 inline-block border rounded overflow-hidden">
-                        <table {...props} />
-                      </div>
-                    );
-                  },
-                }}
-              >
-                {markdown}
-              </ReactMarkdown>
+                    },
+                    table(props: any) {
+                      return (
+                        <div className="table-wrapper my-4 inline-block border rounded overflow-hidden">
+                          <table {...props} />
+                        </div>
+                      );
+                    },
+                  }}
+                >
+                  {markdown}
+                </ReactMarkdown>
+              </div>
             </div>
           </div>
         )}
