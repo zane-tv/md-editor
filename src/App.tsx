@@ -34,6 +34,8 @@ import {
   Download,
   Copy,
   Check,
+  FolderOpen,
+  Save,
 } from "lucide-react";
 import { revokeToken } from "./utils/googleClient";
 import { exportMarkdownToDocs } from "./utils/exportToDocs";
@@ -175,9 +177,12 @@ function App() {
   const [statusMsg, setStatusMsg] = useState("");
   const [createdDocId, setCreatedDocId] = useState<string | null>(null);
   const [showNewFileConfirm, setShowNewFileConfirm] = useState(false);
+  const [fileHandle, setFileHandle] = useState<any>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLDivElement>(null);
+  const isScrollingRef = useRef(false);
 
   useEffect(() => {
     if (darkMode) {
@@ -262,7 +267,7 @@ function App() {
             setIsInitialized(true);
           } catch (err) {
             console.error("Init failed", err);
-            setStatusMsg("Failed to initialize. Check API Key.");
+            setStatusMsg("Khởi tạo thất bại. Kiểm tra API Key.");
           }
         }
       );
@@ -283,7 +288,7 @@ function App() {
       setAccessToken(null);
       localStorage.removeItem("google_access_token");
       localStorage.removeItem("google_token_expiry");
-      setStatusMsg("Logged out");
+      setStatusMsg("Đã đăng xuất");
       setTimeout(() => setStatusMsg(""), 3000);
     }
   };
@@ -307,21 +312,21 @@ function App() {
     }
 
     setIsExporting(true);
-    setStatusMsg("Preparing export...");
+    setStatusMsg("Đang chuẩn bị xuất...");
     setCreatedDocId(null);
 
     try {
       if (view === "edit") setView("preview");
       await new Promise((r) => setTimeout(r, 1000));
-      setStatusMsg("Capturing charts & Creating Doc...");
+      setStatusMsg("Đang chụp biểu đồ & Tạo Doc...");
       const title =
         markdown.split("\n")[0].replace("#", "").trim() || "Markdown Export";
       const docId = await exportMarkdownToDocs(markdown, title);
-      setStatusMsg(`Success!`);
+      setStatusMsg(`Thành công!`);
       setCreatedDocId(docId);
     } catch (error: any) {
       console.error(error);
-      setStatusMsg(`Export failed: ${error.message}`);
+      setStatusMsg(`Xuất thất bại: ${error.message}`);
       if (
         error.message &&
         (error.message.includes("401") || error.message.includes("403"))
@@ -329,7 +334,7 @@ function App() {
         setAccessToken(null);
         localStorage.removeItem("google_access_token");
         localStorage.removeItem("google_token_expiry");
-        setStatusMsg("Token expired. Please Sign In again.");
+        setStatusMsg("Token hết hạn. Vui lòng đăng nhập lại.");
       }
     } finally {
       setIsExporting(false);
@@ -349,8 +354,104 @@ function App() {
 
   const confirmNewFile = () => {
     setMarkdown("");
+    setFileHandle(null);
     setShowNewFileConfirm(false);
     if (textareaRef.current) textareaRef.current.focus();
+  };
+
+  const handleOpenFile = async () => {
+    try {
+      const [handle] = await (window as any).showOpenFilePicker({
+        types: [
+          {
+            description: "Markdown Files",
+            accept: {
+              "text/markdown": [".md", ".markdown"],
+              "text/plain": [".txt"],
+            },
+          },
+        ],
+        multiple: false,
+      });
+      const file = await handle.getFile();
+      const contents = await file.text();
+      setMarkdown(contents);
+      setFileHandle(handle);
+      setStatusMsg("Đã mở: " + file.name);
+      setTimeout(() => setStatusMsg(""), 3000);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleSaveFile = async () => {
+    if (!fileHandle) {
+      handleSaveAs();
+      return;
+    }
+    try {
+      const writable = await fileHandle.createWritable();
+      await writable.write(markdown);
+      await writable.close();
+      setStatusMsg("Đã lưu!");
+      setTimeout(() => setStatusMsg(""), 2000);
+    } catch (err) {
+      console.error(err);
+      setStatusMsg("Lưu thất bại");
+    }
+  };
+
+  const handleSaveAs = async () => {
+    try {
+      const handle = await (window as any).showSaveFilePicker({
+        types: [
+          {
+            description: "Markdown File",
+            accept: { "text/markdown": [".md"] },
+          },
+        ],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(markdown);
+      await writable.close();
+      setFileHandle(handle);
+      setStatusMsg("Đã lưu!");
+      setTimeout(() => setStatusMsg(""), 2000);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleEditorScroll = () => {
+    if (isScrollingRef.current) return;
+    isScrollingRef.current = true;
+    if (textareaRef.current && previewRef.current) {
+      const percent =
+        textareaRef.current.scrollTop /
+        (textareaRef.current.scrollHeight - textareaRef.current.clientHeight);
+      previewRef.current.scrollTop =
+        percent *
+        (previewRef.current.scrollHeight - previewRef.current.clientHeight);
+    }
+    setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 50);
+  };
+
+  const handlePreviewScroll = () => {
+    if (isScrollingRef.current) return;
+    isScrollingRef.current = true;
+    if (textareaRef.current && previewRef.current) {
+      const percent =
+        previewRef.current.scrollTop /
+        (previewRef.current.scrollHeight - previewRef.current.clientHeight);
+      textareaRef.current.scrollTop =
+        percent *
+        (textareaRef.current.scrollHeight - textareaRef.current.clientHeight);
+    }
+    setTimeout(() => {
+      isScrollingRef.current = false;
+    }, 50);
   };
 
   const insertText = (before: string, after: string = "") => {
@@ -394,7 +495,7 @@ function App() {
           break;
         case "s":
           e.preventDefault();
-          handleExport();
+          handleSaveFile();
           break;
         case "p":
           e.preventDefault();
@@ -435,24 +536,23 @@ function App() {
         <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-xl p-6 w-full max-w-sm border dark:border-neutral-700">
             <h2 className="text-lg font-bold mb-2 dark:text-white">
-              Create New File?
+              Tạo file mới?
             </h2>
             <p className="text-neutral-600 dark:text-neutral-300 mb-6 text-sm">
-              Are you sure? This will clear your current content. Any unsaved
-              changes will be lost.
+              Bạn có chắc chắn không? Hành động này sẽ xóa nội dung hiện tại. Mọi thay đổi chưa lưu sẽ bị mất.
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowNewFileConfirm(false)}
                 className="px-4 py-2 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg text-sm font-medium"
               >
-                Cancel
+                Hủy
               </button>
               <button
                 onClick={confirmNewFile}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium"
               >
-                Create New
+                Tạo mới
               </button>
             </div>
           </div>
@@ -465,6 +565,23 @@ function App() {
           <span>Markiva</span>
         </div>
 
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleOpenFile}
+            className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
+            title="Open File"
+          >
+            <FolderOpen size={20} />
+          </button>
+          <button
+            onClick={handleSaveFile}
+            className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
+            title={fileHandle ? "Save" : "Save As"}
+          >
+            <Save size={20} />
+          </button>
+        </div>
+
         <div className="flex items-center gap-2 bg-neutral-100 p-1 rounded-lg">
           <button
             onClick={() => setView("edit")}
@@ -474,7 +591,7 @@ function App() {
                 : "text-neutral-500 hover:text-neutral-700"
             }`}
           >
-            <Code size={16} className="inline mr-1" /> Edit
+            <Code size={16} className="inline mr-1" /> Soạn thảo
           </button>
           <button
             onClick={() => setView("split")}
@@ -484,7 +601,7 @@ function App() {
                 : "text-neutral-500 hover:text-neutral-700"
             }`}
           >
-            Split
+            Song song
           </button>
           <button
             onClick={() => setView("preview")}
@@ -494,7 +611,7 @@ function App() {
                 : "text-neutral-500 hover:text-neutral-700"
             }`}
           >
-            <Eye size={16} className="inline mr-1" /> Preview
+            <Eye size={16} className="inline mr-1" /> Xem trước
           </button>
         </div>
 
@@ -512,7 +629,7 @@ function App() {
                 rel="noreferrer"
                 className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition"
               >
-                Open Doc <ExternalLink size={12} />
+                Mở Google Doc <ExternalLink size={12} />
               </a>
             )}
             {createdDocId && (
@@ -532,21 +649,21 @@ function App() {
           <button
             onClick={toggleDarkMode}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
-            title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            title={darkMode ? "Chế độ sáng" : "Chế độ tối"}
           >
             {darkMode ? <Sun size={20} /> : <Moon size={20} />}
           </button>
           <button
             onClick={handleDownloadMD}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
-            title="Download Markdown"
+            title="Tải về Markdown"
           >
             <Download size={20} />
           </button>
           <button
             onClick={handlePrintPDF}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
-            title="Print / Save as PDF"
+            title="In / Lưu PDF"
           >
             <Printer size={20} />
           </button>
@@ -557,17 +674,17 @@ function App() {
                 onClick={handleAuth}
                 className="flex items-center gap-2 bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-700 px-4 py-2 rounded-lg font-medium transition text-sm shadow-sm"
               >
-                <LogIn size={16} /> Connect Google
+                <LogIn size={16} /> Kết nối Google
               </button>
             ) : (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded">
-                  Connected
+                  Đã kết nối
                 </span>
                 <button
                   onClick={handleLogout}
                   className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"
-                  title="Logout"
+                  title="Đăng xuất"
                 >
                   <LogOut size={18} />
                 </button>
@@ -581,7 +698,7 @@ function App() {
                   ) : (
                     <FileDown size={18} />
                   )}{" "}
-                  <span>Export</span>
+                  <span>Xuất Docs</span>
                 </button>
               </div>
             )
@@ -608,70 +725,70 @@ function App() {
               <ToolbarButton
                 icon={FilePlus}
                 onClick={handleNewFile}
-                title="New File"
+                title="Tạo file mới"
               />
               <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
 
               <ToolbarButton
                 icon={Bold}
                 onClick={() => insertText("**", "**")}
-                title="Bold"
+                title="In đậm"
               />
               <ToolbarButton
                 icon={Italic}
                 onClick={() => insertText("*", "*")}
-                title="Italic"
+                title="In nghiêng"
               />
               <ToolbarButton
                 icon={Strikethrough}
                 onClick={() => insertText("~~", "~~")}
-                title="Strikethrough"
+                title="Gạch ngang"
               />
               <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
 
               <ToolbarButton
                 icon={Heading1}
                 onClick={() => insertText("# ")}
-                title="Heading 1"
+                title="Tiêu đề 1"
               />
               <ToolbarButton
                 icon={Heading2}
                 onClick={() => insertText("## ")}
-                title="Heading 2"
+                title="Tiêu đề 2"
               />
               <ToolbarButton
                 icon={Heading3}
                 onClick={() => insertText("### ")}
-                title="Heading 3"
+                title="Tiêu đề 3"
               />
               <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
 
               <ToolbarButton
                 icon={List}
                 onClick={() => insertText("- ")}
-                title="Unordered List"
+                title="Danh sách"
               />
               <ToolbarButton
                 icon={ListOrdered}
                 onClick={() => insertText("1. ")}
-                title="Ordered List"
+                title="Danh sách số"
               />
               <ToolbarButton
                 icon={CheckSquare}
                 onClick={() => insertText("- [ ] ")}
-                title="Checklist"
+                title="Danh sách việc"
               />
               <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
 
               <ToolbarButton
                 icon={Quote}
                 onClick={() => insertText("> ")}
-                title="Blockquote"
+                title="Trích dẫn"
               />
               <ToolbarButton
                 icon={Minus}
                 onClick={() => insertText("---\n")}
-                title="Horizontal Rule"
+                title="Đường kẻ ngang"
               />
               <ToolbarButton
                 icon={Table}
@@ -680,24 +797,24 @@ function App() {
                     "| Header 1 | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |"
                   )
                 }
-                title="Table"
+                title="Bảng"
               />
               <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
 
               <ToolbarButton
                 icon={Link}
                 onClick={() => insertText("[", "](url)")}
-                title="Link"
+                title="Liên kết"
               />
               <ToolbarButton
                 icon={Image}
                 onClick={() => insertText("![Alt text]", "(url)")}
-                title="Image"
+                title="Hình ảnh"
               />
               <ToolbarButton
                 icon={Code2}
                 onClick={() => insertText("```\n", "\n```")}
-                title="Code Block"
+                title="Khối mã (Code Block)"
               />
               <ToolbarButton
                 icon={Network}
@@ -706,7 +823,7 @@ function App() {
                     "```mermaid\ngraph TD\n    A[Start] --> B[End]\n```"
                   )
                 }
-                title="Mermaid Chart"
+                title="Biểu đồ Mermaid"
               />
             </div>
 
@@ -715,6 +832,7 @@ function App() {
               value={markdown}
               onChange={(e) => setMarkdown(e.target.value)}
               onKeyDown={handleKeyDown}
+              onScroll={handleEditorScroll}
               className="w-full h-full p-8 font-mono text-sm resize-none focus:outline-none leading-relaxed text-neutral-800 bg-white"
               placeholder="Nhập markdown của bạn ở đây..."
             />
@@ -730,6 +848,8 @@ function App() {
 
         {(view === "split" || view === "preview") && (
           <div
+            ref={previewRef}
+            onScroll={handlePreviewScroll}
             className={`preview-pane flex-1 overflow-y-auto bg-neutral-50 ${
               view === "preview" ? "max-w-5xl mx-auto" : ""
             }`}
