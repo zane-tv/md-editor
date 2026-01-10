@@ -874,6 +874,7 @@ function App() {
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   components={{
+                    pre: ({ children }) => <>{children}</>,
                     h1: ({ children, ...props }) => {
                        const id = slugify(getTextFromChildren(children));
                        return <h1 id={id} {...props}>{children}</h1>;
