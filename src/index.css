@@ -22,6 +22,17 @@ body {
   transition: background-color 0.3s, color 0.3s;
 }
 
+/* Light Mode Prose Overrides (Code Blocks) */
+.prose pre {
+  background-color: #e5e5e5; /* neutral-200 */
+  color: #171717; /* neutral-900 */
+}
+
+.prose pre code {
+  background-color: transparent;
+  color: inherit;
+}
+
 /* Dark Mode Styles */
 html.dark body {
   background-color: #171717; /* neutral-900 */
