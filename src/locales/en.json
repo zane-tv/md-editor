@@ -1,0 +1,75 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Create New",
+    "success": "Success!",
+    "failed": "Failed",
+    "loading": "Processing..."
+  },
+  "app": {
+    "title": "Markiva",
+    "newFile": {
+      "title": "Create new file?",
+      "message": "Are you sure? This will clear the current content. Any unsaved changes will be lost."
+    },
+    "view": {
+      "edit": "Edit",
+      "split": "Split",
+      "preview": "Preview"
+    },
+    "actions": {
+      "openFile": "Open File",
+      "save": "Save",
+      "saveAs": "Save As",
+      "downloadMarkdown": "Download Markdown",
+      "print": "Print / Save PDF",
+      "connectGoogle": "Connect Google",
+      "connected": "Connected",
+      "logout": "Logout",
+      "exportDocs": "Export Docs",
+      "openGoogleDoc": "Open Google Doc"
+    },
+    "status": {
+      "initFailed": "Initialization failed. Check API Key.",
+      "loggedOut": "Logged out",
+      "preparingExport": "Preparing export...",
+      "processingExport": "Capturing charts & Creating Doc...",
+      "exportFailed": "Export failed: {{error}}",
+      "tokenExpired": "Token expired. Please login again.",
+      "opened": "Opened: {{file}}",
+      "saved": "Saved!",
+      "saveFailed": "Save failed",
+      "markdownFile": "Markdown Files"
+    },
+    "editor": {
+      "placeholder": "Type your markdown here..."
+    },
+    "toolbar": {
+      "newFile": "New File",
+      "bold": "Bold",
+      "italic": "Italic",
+      "strikethrough": "Strikethrough",
+      "h1": "Heading 1",
+      "h2": "Heading 2",
+      "h3": "Heading 3",
+      "list": "List",
+      "orderedList": "Ordered List",
+      "taskList": "Task List",
+      "quote": "Quote",
+      "horizontalRule": "Horizontal Rule",
+      "table": "Table",
+      "link": "Link",
+      "image": "Image",
+      "codeBlock": "Code Block",
+      "mermaid": "Mermaid Diagram"
+    },
+    "theme": {
+      "light": "Light Mode",
+      "dark": "Dark Mode"
+    }
+  },
+  "toc": {
+    "title": "Table of Contents"
+  },
+  "defaultContent": "# Convert Markdown to Google Docs\n\nWelcome to the Markdown converter tool!\n\n## Chart Support (Mermaid)\n\n```mermaid\ngraph TD\n    A[Start] --> B{Has Markdown?}\n    B -- Yes --> C[Preview & Edit]\n    B -- No --> D[Input Content]\n    C --> E[Export to Google Docs]\n    E --> F[Done]\n```\n\n## Features:\n- **GFM Support**: Tables, checkboxes, links...\n- **Charts**: Mermaid.js\n- **Live Preview**: See results instantly\n"
+}

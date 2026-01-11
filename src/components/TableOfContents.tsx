@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { slugify } from '../utils/slugify';
+import { useTranslation } from 'react-i18next';
 
 interface TocItem {
   level: number;
@@ -9,6 +10,7 @@ interface TocItem {
 
 export const TableOfContents = ({ markdown }: { markdown: string }) => {
   const [headings, setHeadings] = useState<TocItem[]>([]);
+  const { t } = useTranslation();
 
   useEffect(() => {
     const lines = markdown.split('\n');
@@ -40,7 +42,7 @@ export const TableOfContents = ({ markdown }: { markdown: string }) => {
 
   return (
     <div className="toc p-4 text-sm w-full">
-      <h3 className="font-bold mb-4 text-neutral-500 uppercase text-xs dark:text-neutral-400">Mục lục</h3>
+      <h3 className="font-bold mb-4 text-neutral-500 uppercase text-xs dark:text-neutral-400">{t('toc.title')}</h3>
       <ul className="space-y-2">
         {headings.map((h, i) => (
           <li key={i} style={{ paddingLeft: `${(h.level - 1) * 12}px` }}>
