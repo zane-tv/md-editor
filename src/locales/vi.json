@@ -1,0 +1,75 @@
+{
+  "common": {
+    "cancel": "Hủy",
+    "confirm": "Tạo mới",
+    "success": "Thành công!",
+    "failed": "Thất bại",
+    "loading": "Đang xử lý..."
+  },
+  "app": {
+    "title": "Markiva",
+    "newFile": {
+      "title": "Tạo file mới?",
+      "message": "Bạn có chắc chắn không? Hành động này sẽ xóa nội dung hiện tại. Mọi thay đổi chưa lưu sẽ bị mất."
+    },
+    "view": {
+      "edit": "Soạn thảo",
+      "split": "Song song",
+      "preview": "Xem trước"
+    },
+    "actions": {
+      "openFile": "Mở file",
+      "save": "Lưu",
+      "saveAs": "Lưu thành",
+      "downloadMarkdown": "Tải về Markdown",
+      "print": "In / Lưu PDF",
+      "connectGoogle": "Kết nối Google",
+      "connected": "Đã kết nối",
+      "logout": "Đăng xuất",
+      "exportDocs": "Xuất Docs",
+      "openGoogleDoc": "Mở Google Doc"
+    },
+    "status": {
+      "initFailed": "Khởi tạo thất bại. Kiểm tra API Key.",
+      "loggedOut": "Đã đăng xuất",
+      "preparingExport": "Đang chuẩn bị xuất...",
+      "processingExport": "Đang chụp biểu đồ & Tạo Doc...",
+      "exportFailed": "Xuất thất bại: {{error}}",
+      "tokenExpired": "Token hết hạn. Vui lòng đăng nhập lại.",
+      "opened": "Đã mở: {{file}}",
+      "saved": "Đã lưu!",
+      "saveFailed": "Lưu thất bại",
+      "markdownFile": "Tập tin Markdown"
+    },
+    "editor": {
+      "placeholder": "Nhập markdown của bạn ở đây..."
+    },
+    "toolbar": {
+      "newFile": "Tạo file mới",
+      "bold": "In đậm",
+      "italic": "In nghiêng",
+      "strikethrough": "Gạch ngang",
+      "h1": "Tiêu đề 1",
+      "h2": "Tiêu đề 2",
+      "h3": "Tiêu đề 3",
+      "list": "Danh sách",
+      "orderedList": "Danh sách số",
+      "taskList": "Danh sách việc",
+      "quote": "Trích dẫn",
+      "horizontalRule": "Đường kẻ ngang",
+      "table": "Bảng",
+      "link": "Liên kết",
+      "image": "Hình ảnh",
+      "codeBlock": "Khối mã (Code Block)",
+      "mermaid": "Biểu đồ Mermaid"
+    },
+    "theme": {
+      "light": "Chế độ sáng",
+      "dark": "Chế độ tối"
+    }
+  },
+  "toc": {
+    "title": "Mục lục"
+  },
+  "defaultContent": "# Chuyển đổi Markdown sang Google Docs\n\nChào mừng bạn đến với công cụ chuyển đổi Markdown!\n\n## Hỗ trợ Biểu đồ (Mermaid)\n\n```mermaid\ngraph TD\n    A[Bắt đầu] --> B{Có Markdown?}\n    B -- Có --> C[Preview & Chỉnh sửa]\n    B -- Không --> D[Nhập nội dung]\n    C --> E[Export sang Google Docs]\n    E --> F[Hoàn thành]\n```\n\n## Các tính năng:\n- **Hỗ trợ GFM**: Bảng, checkbox, links...\n- **Biểu đồ**: Mermaid.js\n- **Preview trực tiếp**: Nhìn thấy kết quả ngay lập tức\n"
+}

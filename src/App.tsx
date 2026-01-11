@@ -37,10 +37,12 @@ import {
   FolderOpen,
   Save,
 } from "lucide-react";
+import { useTranslation } from 'react-i18next';
 import { revokeToken } from "./utils/googleClient";
 import { exportMarkdownToDocs } from "./utils/exportToDocs";
 import { TableOfContents } from "./components/TableOfContents";
 import { getTextFromChildren, slugify } from "./utils/slugify";
+import i18next from 'i18next';
 
 // Initialize mermaid
 mermaid.initialize({
@@ -96,27 +98,6 @@ const Mermaid = ({ chart, darkMode }: { chart: string; darkMode: boolean }) => {
   );
 };
 
-const DEFAULT_MD = `# Chuyển đổi Markdown sang Google Docs
-
-Chào mừng bạn đến với công cụ chuyển đổi Markdown!
-
-## Hỗ trợ Biểu đồ (Mermaid)
-
-\`\`\`mermaid
-graph TD
-    A[Bắt đầu] --> B{Có Markdown?}
-    B -- Có --> C[Preview & Chỉnh sửa]
-    B -- Không --> D[Nhập nội dung]
-    C --> E[Export sang Google Docs]
-    E --> F[Hoàn thành]
-\`\`\`
-
-## Các tính năng:
-- **Hỗ trợ GFM**: Bảng, checkbox, links...
-- **Biểu đồ**: Mermaid.js
-- **Preview trực tiếp**: Nhìn thấy kết quả ngay lập tức
-`;
-
 const CodeBlock = ({ children, className, ...rest }: any) => {
   const [copied, setCopied] = useState(false);
   const code = String(children).replace(/\n$/, "");
@@ -167,7 +148,8 @@ const CodeBlock = ({ children, className, ...rest }: any) => {
 };
 
 function App() {
-  const [markdown, setMarkdown] = useState(DEFAULT_MD);
+  const { t, i18n } = useTranslation();
+  const [markdown, setMarkdown] = useState(() => i18next.t('defaultContent'));
   const [view, setView] = useState<"split" | "edit" | "preview">("split");
   const [darkMode, setDarkMode] = useState(
     () => localStorage.getItem("theme") === "dark"
@@ -282,14 +264,20 @@ function App() {
             setIsInitialized(true);
           } catch (err) {
             console.error("Init failed", err);
-            setStatusMsg("Khởi tạo thất bại. Kiểm tra API Key.");
+            setStatusMsg(t('app.status.initFailed'));
           }
         }
       );
     }
-  }, [apiKey, clientId, isInitialized]);
+  }, [apiKey, clientId, isInitialized, t]);
 
   const toggleDarkMode = () => setDarkMode(!darkMode);
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'vi' ? 'en' : 'vi';
+    i18n.changeLanguage(newLang);
+    localStorage.setItem('language', newLang);
+  };
 
   const handleAuth = () => {
     if (tokenClient) {
@@ -303,7 +291,7 @@ function App() {
       setAccessToken(null);
       localStorage.removeItem("google_access_token");
       localStorage.removeItem("google_token_expiry");
-      setStatusMsg("Đã đăng xuất");
+      setStatusMsg(t('app.status.loggedOut'));
       setTimeout(() => setStatusMsg(""), 3000);
     }
   };
@@ -327,21 +315,21 @@ function App() {
     }
 
     setIsExporting(true);
-    setStatusMsg("Đang chuẩn bị xuất...");
+    setStatusMsg(t('app.status.preparingExport'));
     setCreatedDocId(null);
 
     try {
       if (view === "edit") setView("preview");
       await new Promise((r) => setTimeout(r, 1000));
-      setStatusMsg("Đang chụp biểu đồ & Tạo Doc...");
+      setStatusMsg(t('app.status.processingExport'));
       const title =
         markdown.split("\n")[0].replace("#", "").trim() || "Markdown Export";
       const docId = await exportMarkdownToDocs(markdown, title);
-      setStatusMsg(`Thành công!`);
+      setStatusMsg(t('common.success'));
       setCreatedDocId(docId);
     } catch (error: any) {
       console.error(error);
-      setStatusMsg(`Xuất thất bại: ${error.message}`);
+      setStatusMsg(t('app.status.exportFailed', { error: error.message }));
       if (
         error.message &&
         (error.message.includes("401") || error.message.includes("403"))
@@ -349,7 +337,7 @@ function App() {
         setAccessToken(null);
         localStorage.removeItem("google_access_token");
         localStorage.removeItem("google_token_expiry");
-        setStatusMsg("Token hết hạn. Vui lòng đăng nhập lại.");
+        setStatusMsg(t('app.status.tokenExpired'));
       }
     } finally {
       setIsExporting(false);
@@ -379,7 +367,7 @@ function App() {
       const [handle] = await (window as any).showOpenFilePicker({
         types: [
           {
-            description: "Markdown Files",
+            description: t('app.status.markdownFile', { defaultValue: 'Markdown Files' }), // Fallback just in case
             accept: {
               "text/markdown": [".md", ".markdown"],
               "text/plain": [".txt"],
@@ -392,7 +380,7 @@ function App() {
       const contents = await file.text();
       setMarkdown(contents);
       setFileHandle(handle);
-      setStatusMsg("Đã mở: " + file.name);
+      setStatusMsg(t('app.status.opened', { file: file.name }));
       setTimeout(() => setStatusMsg(""), 3000);
     } catch (err) {
       console.error(err);
@@ -408,11 +396,11 @@ function App() {
       const writable = await fileHandle.createWritable();
       await writable.write(markdown);
       await writable.close();
-      setStatusMsg("Đã lưu!");
+      setStatusMsg(t('app.status.saved'));
       setTimeout(() => setStatusMsg(""), 2000);
     } catch (err) {
       console.error(err);
-      setStatusMsg("Lưu thất bại");
+      setStatusMsg(t('app.status.saveFailed'));
     }
   };
 
@@ -430,7 +418,7 @@ function App() {
       await writable.write(markdown);
       await writable.close();
       setFileHandle(handle);
-      setStatusMsg("Đã lưu!");
+      setStatusMsg(t('app.status.saved'));
       setTimeout(() => setStatusMsg(""), 2000);
     } catch (err) {
       console.error(err);
@@ -551,23 +539,23 @@ function App() {
         <div className="absolute inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-xl p-6 w-full max-w-sm border dark:border-neutral-700">
             <h2 className="text-lg font-bold mb-2 dark:text-white">
-              Tạo file mới?
+              {t('app.newFile.title')}
             </h2>
             <p className="text-neutral-600 dark:text-neutral-300 mb-6 text-sm">
-              Bạn có chắc chắn không? Hành động này sẽ xóa nội dung hiện tại. Mọi thay đổi chưa lưu sẽ bị mất.
+              {t('app.newFile.message')}
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowNewFileConfirm(false)}
                 className="px-4 py-2 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg text-sm font-medium"
               >
-                Hủy
+                {t('common.cancel')}
               </button>
               <button
                 onClick={confirmNewFile}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium"
               >
-                Tạo mới
+                {t('common.confirm')}
               </button>
             </div>
           </div>
@@ -577,21 +565,21 @@ function App() {
       <header className="h-14 border-b bg-white flex items-center justify-between px-6 sticky top-0 z-10 shadow-sm transition-colors duration-300">
         <div className="flex items-center gap-2 font-bold text-blue-600">
           <img src="/logo.png" alt="Markiva" className="w-6 h-6" />
-          <span>Markiva</span>
+          <span>{t('app.title')}</span>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={handleOpenFile}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
-            title="Open File"
+            title={t('app.actions.openFile')}
           >
             <FolderOpen size={20} />
           </button>
           <button
             onClick={handleSaveFile}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
-            title={fileHandle ? "Save" : "Save As"}
+            title={fileHandle ? t('app.actions.save') : t('app.actions.saveAs')}
           >
             <Save size={20} />
           </button>
@@ -606,7 +594,7 @@ function App() {
                 : "text-neutral-500 hover:text-neutral-700"
             }`}
           >
-            <Code size={16} className="inline mr-1" /> Soạn thảo
+            <Code size={16} className="inline mr-1" /> {t('app.view.edit')}
           </button>
           <button
             onClick={() => setView("split")}
@@ -616,7 +604,7 @@ function App() {
                 : "text-neutral-500 hover:text-neutral-700"
             }`}
           >
-            Song song
+            {t('app.view.split')}
           </button>
           <button
             onClick={() => setView("preview")}
@@ -626,7 +614,7 @@ function App() {
                 : "text-neutral-500 hover:text-neutral-700"
             }`}
           >
-            <Eye size={16} className="inline mr-1" /> Xem trước
+            <Eye size={16} className="inline mr-1" /> {t('app.view.preview')}
           </button>
         </div>
 
@@ -644,7 +632,7 @@ function App() {
                 rel="noreferrer"
                 className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition"
               >
-                Mở Google Doc <ExternalLink size={12} />
+                {t('app.actions.openGoogleDoc')} <ExternalLink size={12} />
               </a>
             )}
             {createdDocId && (
@@ -662,23 +650,31 @@ function App() {
           <div className="h-6 w-px bg-neutral-200 mx-1"></div>
 
           <button
+            onClick={toggleLanguage}
+            className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition font-mono text-sm font-bold"
+            title={i18n.language === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
+          >
+            {i18n.language === 'vi' ? 'EN' : 'VI'}
+          </button>
+
+          <button
             onClick={toggleDarkMode}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
-            title={darkMode ? "Chế độ sáng" : "Chế độ tối"}
+            title={darkMode ? t('app.theme.light') : t('app.theme.dark')}
           >
             {darkMode ? <Sun size={20} /> : <Moon size={20} />}
           </button>
           <button
             onClick={handleDownloadMD}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
-            title="Tải về Markdown"
+            title={t('app.actions.downloadMarkdown')}
           >
             <Download size={20} />
           </button>
           <button
             onClick={handlePrintPDF}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
-            title="In / Lưu PDF"
+            title={t('app.actions.print')}
           >
             <Printer size={20} />
           </button>
@@ -689,17 +685,17 @@ function App() {
                 onClick={handleAuth}
                 className="flex items-center gap-2 bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-700 px-4 py-2 rounded-lg font-medium transition text-sm shadow-sm"
               >
-                <LogIn size={16} /> Kết nối Google
+                <LogIn size={16} /> {t('app.actions.connectGoogle')}
               </button>
             ) : (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-green-600 font-medium bg-green-50 px-2 py-1 rounded">
-                  Đã kết nối
+                  {t('app.actions.connected')}
                 </span>
                 <button
                   onClick={handleLogout}
                   className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"
-                  title="Đăng xuất"
+                  title={t('app.actions.logout')}
                 >
                   <LogOut size={18} />
                 </button>
@@ -713,7 +709,7 @@ function App() {
                   ) : (
                     <FileDown size={18} />
                   )}{" "}
-                  <span>Xuất Docs</span>
+                  <span>{t('app.actions.exportDocs')}</span>
                 </button>
               </div>
             )
@@ -740,70 +736,70 @@ function App() {
               <ToolbarButton
                 icon={FilePlus}
                 onClick={handleNewFile}
-                title="Tạo file mới"
+                title={t('app.toolbar.newFile')}
               />
               <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
 
               <ToolbarButton
                 icon={Bold}
                 onClick={() => insertText("**", "**")}
-                title="In đậm"
+                title={t('app.toolbar.bold')}
               />
               <ToolbarButton
                 icon={Italic}
                 onClick={() => insertText("*", "*")}
-                title="In nghiêng"
+                title={t('app.toolbar.italic')}
               />
               <ToolbarButton
                 icon={Strikethrough}
                 onClick={() => insertText("~~", "~~")}
-                title="Gạch ngang"
+                title={t('app.toolbar.strikethrough')}
               />
               <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
 
               <ToolbarButton
                 icon={Heading1}
                 onClick={() => insertText("# ")}
-                title="Tiêu đề 1"
+                title={t('app.toolbar.h1')}
               />
               <ToolbarButton
                 icon={Heading2}
                 onClick={() => insertText("## ")}
-                title="Tiêu đề 2"
+                title={t('app.toolbar.h2')}
               />
               <ToolbarButton
                 icon={Heading3}
                 onClick={() => insertText("### ")}
-                title="Tiêu đề 3"
+                title={t('app.toolbar.h3')}
               />
               <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
 
               <ToolbarButton
                 icon={List}
                 onClick={() => insertText("- ")}
-                title="Danh sách"
+                title={t('app.toolbar.list')}
               />
               <ToolbarButton
                 icon={ListOrdered}
                 onClick={() => insertText("1. ")}
-                title="Danh sách số"
+                title={t('app.toolbar.orderedList')}
               />
               <ToolbarButton
                 icon={CheckSquare}
                 onClick={() => insertText("- [ ] ")}
-                title="Danh sách việc"
+                title={t('app.toolbar.taskList')}
               />
               <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
 
               <ToolbarButton
                 icon={Quote}
                 onClick={() => insertText("> ")}
-                title="Trích dẫn"
+                title={t('app.toolbar.quote')}
               />
               <ToolbarButton
                 icon={Minus}
                 onClick={() => insertText("---\n")}
-                title="Đường kẻ ngang"
+                title={t('app.toolbar.horizontalRule')}
               />
               <ToolbarButton
                 icon={Table}
@@ -812,24 +808,24 @@ function App() {
                     "| Header 1 | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |"
                   )
                 }
-                title="Bảng"
+                title={t('app.toolbar.table')}
               />
               <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
 
               <ToolbarButton
                 icon={Link}
                 onClick={() => insertText("[", "](url)")}
-                title="Liên kết"
+                title={t('app.toolbar.link')}
               />
               <ToolbarButton
                 icon={Image}
                 onClick={() => insertText("![Alt text]", "(url)")}
-                title="Hình ảnh"
+                title={t('app.toolbar.image')}
               />
               <ToolbarButton
                 icon={Code2}
                 onClick={() => insertText("```\n", "\n```")}
-                title="Khối mã (Code Block)"
+                title={t('app.toolbar.codeBlock')}
               />
               <ToolbarButton
                 icon={Network}
@@ -838,7 +834,7 @@ function App() {
                     "```mermaid\ngraph TD\n    A[Start] --> B[End]\n```"
                   )
                 }
-                title="Biểu đồ Mermaid"
+                title={t('app.toolbar.mermaid')}
               />
             </div>
 
@@ -849,7 +845,7 @@ function App() {
               onKeyDown={handleKeyDown}
               onScroll={handleEditorScroll}
               className="w-full h-full p-8 font-mono text-sm resize-none focus:outline-none leading-relaxed text-neutral-800 bg-white"
-              placeholder="Nhập markdown của bạn ở đây..."
+              placeholder={t('app.editor.placeholder')}
             />
           </div>
         )}
