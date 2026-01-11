@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import mermaid from "mermaid";
@@ -532,6 +532,69 @@ function App() {
     </button>
   );
 
+  const markdownComponents = useMemo(
+    () => ({
+      pre: ({ children }: any) => <>{children}</>,
+      h1: ({ children, ...props }: any) => {
+        const id = slugify(getTextFromChildren(children));
+        return (
+          <h1 id={id} {...props}>
+            {children}
+          </h1>
+        );
+      },
+      h2: ({ children, ...props }: any) => {
+        const id = slugify(getTextFromChildren(children));
+        return (
+          <h2 id={id} {...props}>
+            {children}
+          </h2>
+        );
+      },
+      h3: ({ children, ...props }: any) => {
+        const id = slugify(getTextFromChildren(children));
+        return (
+          <h3 id={id} {...props}>
+            {children}
+          </h3>
+        );
+      },
+      h4: ({ children, ...props }: any) => {
+        const id = slugify(getTextFromChildren(children));
+        return (
+          <h4 id={id} {...props}>
+            {children}
+          </h4>
+        );
+      },
+      code(props: any) {
+        const { children, className, node, ...rest } = props;
+        const match = /mermaid/i.test(className || "");
+        if (match) {
+          return (
+            <Mermaid
+              chart={String(children).replace(/\n$/, "")}
+              darkMode={darkMode}
+            />
+          );
+        }
+        return (
+          <CodeBlock className={className} {...rest}>
+            {children}
+          </CodeBlock>
+        );
+      },
+      table(props: any) {
+        return (
+          <div className="table-wrapper my-4 inline-block border rounded overflow-hidden">
+            <table {...props} />
+          </div>
+        );
+      },
+    }),
+    [darkMode]
+  );
+
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 flex flex-col relative transition-colors duration-300">
       {/* Confirm New File Modal */}
@@ -877,49 +940,7 @@ function App() {
               }`}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
-                  components={{
-                    pre: ({ children }) => <>{children}</>,
-                    h1: ({ children, ...props }) => {
-                       const id = slugify(getTextFromChildren(children));
-                       return <h1 id={id} {...props}>{children}</h1>;
-                    },
-                    h2: ({ children, ...props }) => {
-                       const id = slugify(getTextFromChildren(children));
-                       return <h2 id={id} {...props}>{children}</h2>;
-                    },
-                    h3: ({ children, ...props }) => {
-                       const id = slugify(getTextFromChildren(children));
-                       return <h3 id={id} {...props}>{children}</h3>;
-                    },
-                    h4: ({ children, ...props }) => {
-                       const id = slugify(getTextFromChildren(children));
-                       return <h4 id={id} {...props}>{children}</h4>;
-                    },
-                    code(props: any) {
-                      const { children, className, node, ...rest } = props;
-                      const match = /mermaid/i.test(className || "");
-                      if (match) {
-                        return (
-                          <Mermaid
-                            chart={String(children).replace(/\n$/, "")}
-                            darkMode={darkMode}
-                          />
-                        );
-                      }
-                      return (
-                        <CodeBlock className={className} {...rest}>
-                          {children}
-                        </CodeBlock>
-                      );
-                    },
-                    table(props: any) {
-                      return (
-                        <div className="table-wrapper my-4 inline-block border rounded overflow-hidden">
-                          <table {...props} />
-                        </div>
-                      );
-                    },
-                  }}
+                  components={markdownComponents}
                 >
                   {markdown}
                 </ReactMarkdown>
