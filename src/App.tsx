@@ -40,9 +40,11 @@ import {
 import { useTranslation } from 'react-i18next';
 import { revokeToken } from "./utils/googleClient";
 import { exportMarkdownToDocs } from "./utils/exportToDocs";
+import { generateShareUrl, checkUrlForSharedContent } from "./utils/urlShare";
 import { TableOfContents } from "./components/TableOfContents";
 import { getTextFromChildren, slugify } from "./utils/slugify";
 import i18next from 'i18next';
+import { Share2 } from "lucide-react";
 
 // Initialize mermaid
 mermaid.initialize({
@@ -149,7 +151,12 @@ const CodeBlock = ({ children, className, ...rest }: any) => {
 
 function App() {
   const { t, i18n } = useTranslation();
-  const [markdown, setMarkdown] = useState(() => i18next.t('defaultContent'));
+  const [markdown, setMarkdown] = useState(() => {
+    // Check for shared content first
+    const shared = checkUrlForSharedContent();
+    if (shared) return shared;
+    return i18next.t('defaultContent');
+  });
   const [view, setView] = useState<"split" | "edit" | "preview">("split");
   const [darkMode, setDarkMode] = useState(
     () => localStorage.getItem("theme") === "dark"
@@ -349,6 +356,18 @@ function App() {
     setTimeout(() => {
       window.print();
     }, 500);
+  };
+
+  const handleShare = () => {
+    try {
+      const url = generateShareUrl(markdown);
+      navigator.clipboard.writeText(url);
+      setStatusMsg(t('app.status.linkCopied'));
+      setTimeout(() => setStatusMsg(""), 3000);
+    } catch (error) {
+      console.error(error);
+      setStatusMsg(t('app.status.linkGeneratedError'));
+    }
   };
 
   const handleNewFile = () => {
@@ -677,6 +696,13 @@ function App() {
             title={t('app.actions.print')}
           >
             <Printer size={20} />
+          </button>
+          <button
+            onClick={handleShare}
+            className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
+            title={t('app.actions.share')}
+          >
+            <Share2 size={20} />
           </button>
 
           {isInitialized ? (
