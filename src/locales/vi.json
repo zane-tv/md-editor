@@ -27,10 +27,13 @@
       "connected": "Đã kết nối",
       "logout": "Đăng xuất",
       "exportDocs": "Xuất Docs",
-      "openGoogleDoc": "Mở Google Doc"
+      "openGoogleDoc": "Mở Google Doc",
+      "share": "Chia sẻ"
     },
     "status": {
       "initFailed": "Khởi tạo thất bại. Kiểm tra API Key.",
+      "linkCopied": "Đã sao chép link chia sẻ!",
+      "linkGeneratedError": "Lỗi tạo link.",
       "loggedOut": "Đã đăng xuất",
       "preparingExport": "Đang chuẩn bị xuất...",
       "processingExport": "Đang chụp biểu đồ & Tạo Doc...",

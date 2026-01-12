@@ -27,10 +27,13 @@
       "connected": "Connected",
       "logout": "Logout",
       "exportDocs": "Export Docs",
-      "openGoogleDoc": "Open Google Doc"
+      "openGoogleDoc": "Open Google Doc",
+      "share": "Share"
     },
     "status": {
       "initFailed": "Initialization failed. Check API Key.",
+      "linkCopied": "Share link copied to clipboard!",
+      "linkGeneratedError": "Error generating link.",
       "loggedOut": "Logged out",
       "preparingExport": "Preparing export...",
       "processingExport": "Capturing charts & Creating Doc...",
