@@ -39,14 +39,13 @@ export const initGoogleClient = async (apiKey: string) => {
 };
 
 export const initTokenClient = (clientId: string, callback: (tokenResponse: any) => void) => {
-  // @ts-ignore
+  // @ts-expect-error - google types are not fully loaded
   return google.accounts.oauth2.initTokenClient({
     client_id: clientId,
     scope: 'https://www.googleapis.com/auth/documents https://www.googleapis.com/auth/drive.file',
     callback: (tokenResponse: any) => {
       if (tokenResponse && tokenResponse.access_token) {
         // Manually set the token for gapi client
-        // @ts-ignore
         gapi.client.setToken(tokenResponse);
         callback(tokenResponse);
       }
@@ -55,12 +54,11 @@ export const initTokenClient = (clientId: string, callback: (tokenResponse: any)
 };
 
 export const restoreToken = (token: any) => {
-    // @ts-ignore
     gapi.client.setToken(token);
 };
 
 export const revokeToken = (token: string) => {
-  // @ts-ignore
+  // @ts-expect-error - google types are not fully loaded
   google.accounts.oauth2.revoke(token, () => {
     console.log('Token revoked');
   });
