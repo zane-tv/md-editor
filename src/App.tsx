@@ -40,7 +40,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { revokeToken } from "./utils/googleClient";
 import { exportMarkdownToDocs } from "./utils/exportToDocs";
-import { generateShareUrl, checkUrlForSharedContent } from "./utils/urlShare";
+import { generateShareUrl, checkUrlForSharedContent, getViewModeFromUrl } from "./utils/urlShare";
 import { TableOfContents } from "./components/TableOfContents";
 import { getTextFromChildren, slugify } from "./utils/slugify";
 import i18next from 'i18next';
@@ -165,7 +165,13 @@ function App() {
     return () => clearTimeout(timer);
   }, [markdown]);
 
-  const [view, setView] = useState<"split" | "edit" | "preview">("split");
+  const [view, setView] = useState<"split" | "edit" | "preview">(() => {
+    const sharedView = getViewModeFromUrl();
+    if (sharedView === 'edit' || sharedView === 'preview' || sharedView === 'split') {
+      return sharedView;
+    }
+    return "split";
+  });
   const [darkMode, setDarkMode] = useState(
     () => localStorage.getItem("theme") === "dark"
   );
@@ -368,7 +374,7 @@ function App() {
 
   const handleShare = () => {
     try {
-      const url = generateShareUrl(markdown);
+      const url = generateShareUrl(markdown, view);
       navigator.clipboard.writeText(url);
       setStatusMsg(t('app.status.linkCopied'));
       setTimeout(() => setStatusMsg(""), 3000);
