@@ -3,6 +3,7 @@ import remarkParse from 'remark-parse';
 import remarkGfm from 'remark-gfm';
 import html2canvas from 'html2canvas';
 import { gapi } from 'gapi-script';
+import { generateGoogleDocsRequests, FONT_FAMILY, BASE_FONT_SIZE } from './docsGenerator';
 
 async function uploadImageToDrive(blob: Blob): Promise<string> {
   const accessToken = (gapi.auth as any).getToken().access_token;
@@ -61,175 +62,6 @@ async function captureElement(selector: string, index: number): Promise<Blob> {
       else reject(new Error('Canvas to Blob failed'));
     }, 'image/png');
   });
-}
-
-// Exported for testing/reusability
-export function generateGoogleDocsRequests(tree: any, nodeImageMap: Map<any, string>) {
-  const requests: any[] = [];
-  let currentIndex = 1;
-  const tableNodes: any[] = [];
-  const TABLE_PLACEHOLDER_PREFIX = '{{TABLE_PLACEHOLDER_';
-  const TABLE_PLACEHOLDER_SUFFIX = '}}';
-
-  function processNode(node: any) {
-    if (node.type === 'root') {
-      node.children.forEach(processNode);
-    }
-    // --- HEADINGS ---
-    else if (node.type === 'heading') {
-      const start = currentIndex;
-      node.children.forEach(processNode);
-
-      // Insert newline immediately
-      requests.push({ insertText: { location: { index: currentIndex }, text: '\n' } });
-      currentIndex += 1;
-
-      const end = currentIndex;
-
-      // Apply Semantic Style (HEADING_X)
-      requests.push({
-        updateParagraphStyle: {
-          range: { startIndex: start, endIndex: end }, // Includes newline
-          paragraphStyle: { namedStyleType: `HEADING_${Math.min(node.depth, 6)}` },
-          fields: 'namedStyleType'
-        }
-      });
-
-      // Apply Visual Style (Sync with Markdown Preview)
-      // Defaults based on Tailwind Prose (approximate PT sizes)
-      const fontSizeMap: Record<number, number> = { 1: 26, 2: 20, 3: 16, 4: 14, 5: 12, 6: 11 };
-
-      requests.push({
-         updateTextStyle: {
-            range: { startIndex: start, endIndex: end }, // Includes newline
-            textStyle: {
-                fontSize: { magnitude: fontSizeMap[node.depth] || 11, unit: 'PT' },
-                bold: true,
-            },
-            fields: 'fontSize,bold'
-         }
-      });
-    }
-    // --- PARAGRAPHS ---
-    else if (node.type === 'paragraph') {
-      node.children.forEach(processNode);
-      requests.push({ insertText: { location: { index: currentIndex }, text: '\n' } });
-      currentIndex += 1;
-    }
-    // --- TEXT ---
-    else if (node.type === 'text') {
-      const text = node.value;
-      requests.push({ insertText: { location: { index: currentIndex }, text } });
-      currentIndex += text.length;
-    }
-    // --- FORMATTING ---
-    else if (node.type === 'strong' || node.type === 'emphasis') {
-      const start = currentIndex;
-      node.children.forEach(processNode);
-      const end = currentIndex;
-      requests.push({
-        updateTextStyle: {
-          range: { startIndex: start, endIndex: end },
-          textStyle: node.type === 'strong' ? { bold: true } : { italic: true },
-          fields: node.type === 'strong' ? 'bold' : 'italic'
-        }
-      });
-    }
-    // --- LINK ---
-    else if (node.type === 'link') {
-      const start = currentIndex;
-      node.children.forEach(processNode);
-      const end = currentIndex;
-      requests.push({
-        updateTextStyle: {
-          range: { startIndex: start, endIndex: end },
-          textStyle: { link: { url: node.url } },
-          fields: 'link'
-        }
-      });
-    }
-    // --- LISTS ---
-    else if (node.type === 'list') {
-      node.children.forEach(processNode);
-    } else if (node.type === 'listItem') {
-      requests.push({ insertText: { location: { index: currentIndex }, text: '• ' } });
-      currentIndex += 2;
-      node.children.forEach(processNode);
-    }
-    // --- IMAGES ---
-    else if (node.type === 'image') {
-      if (node.url && node.url.startsWith('http')) {
-           requests.push({
-              insertInlineImage: {
-                  location: { index: currentIndex },
-                  uri: node.url,
-                  objectSize: {
-                      height: { magnitude: 300, unit: 'PT' },
-                      width: { magnitude: 400, unit: 'PT' }
-                  }
-              }
-          });
-          currentIndex += 1;
-      } else {
-          const text = `[Image: ${node.alt}]`;
-          requests.push({ insertText: { location: { index: currentIndex }, text } });
-          currentIndex += text.length;
-      }
-    }
-    // --- CODE BLOCKS ---
-    else if (node.type === 'code') {
-      if (node.lang === 'mermaid') {
-        const url = nodeImageMap.get(node);
-        if (url) {
-            insertImage(url);
-        }
-      } else {
-        const text = node.value;
-        const start = currentIndex;
-        requests.push({ insertText: { location: { index: currentIndex }, text: text + '\n' } });
-        currentIndex += text.length + 1;
-        requests.push({
-            updateTextStyle: {
-                range: { startIndex: start, endIndex: currentIndex - 1 },
-                textStyle: {
-                    weightedFontFamily: { fontFamily: 'Courier New' },
-                    backgroundColor: { color: { rgbColor: { red: 0.95, green: 0.95, blue: 0.95 } } }
-                },
-                fields: 'weightedFontFamily,backgroundColor'
-            }
-        });
-      }
-    }
-    // --- TABLES ---
-    else if (node.type === 'table') {
-        const tableIndex = tableNodes.length;
-        tableNodes.push(node);
-        const placeholder = `${TABLE_PLACEHOLDER_PREFIX}${tableIndex}${TABLE_PLACEHOLDER_SUFFIX}`;
-        requests.push({ insertText: { location: { index: currentIndex }, text: placeholder } });
-        currentIndex += placeholder.length;
-        requests.push({ insertText: { location: { index: currentIndex }, text: '\n' } });
-        currentIndex += 1;
-    }
-  }
-
-  function insertImage(url: string) {
-    requests.push({
-        insertInlineImage: {
-            location: { index: currentIndex },
-            uri: url,
-            objectSize: {
-                height: { magnitude: 300, unit: 'PT' },
-                width: { magnitude: 500, unit: 'PT' }
-            }
-        }
-    });
-    currentIndex += 1;
-    requests.push({ insertText: { location: { index: currentIndex }, text: '\n' } });
-    currentIndex += 1;
-  }
-
-  processNode(tree);
-  return { requests, tableNodes, TABLE_PLACEHOLDER_PREFIX, TABLE_PLACEHOLDER_SUFFIX };
 }
 
 export async function exportMarkdownToDocs(markdown: string, title: string) {
@@ -366,6 +198,16 @@ export async function exportMarkdownToDocs(markdown: string, title: string) {
                              if (n.type === 'text') {
                                  const text = n.value;
                                  populationRequests.push({ insertText: { location: { index: localCursor }, text } });
+                                 populationRequests.push({
+                                     updateTextStyle: {
+                                         range: { startIndex: localCursor, endIndex: localCursor + text.length },
+                                         textStyle: {
+                                             weightedFontFamily: { fontFamily: FONT_FAMILY },
+                                             fontSize: { magnitude: BASE_FONT_SIZE, unit: 'PT' }
+                                         },
+                                         fields: 'weightedFontFamily,fontSize'
+                                     }
+                                 });
                                  localCursor += text.length;
                              } else if (n.type === 'strong' || n.type === 'emphasis') {
                                  const s = localCursor;
