@@ -18,10 +18,13 @@ export const decompressFromPath = (compressed: string): string | null => {
 /**
  * Generates the full shareable URL.
  */
-export const generateShareUrl = (content: string): string => {
+export const generateShareUrl = (content: string, viewMode?: string): string => {
   const compressed = compressToPath(content);
   const url = new URL(window.location.href);
   url.searchParams.set('data', compressed);
+  if (viewMode) {
+    url.searchParams.set('view', viewMode);
+  }
   return url.toString();
 };
 
@@ -35,4 +38,12 @@ export const checkUrlForSharedContent = (): string | null => {
     return decompressFromPath(data);
   }
   return null;
+};
+
+/**
+ * Gets the view mode from the URL if present.
+ */
+export const getViewModeFromUrl = (): string | null => {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('view');
 };
