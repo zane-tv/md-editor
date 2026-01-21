@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import mermaid from "mermaid";
@@ -99,6 +99,24 @@ const Mermaid = ({ chart, darkMode }: { chart: string; darkMode: boolean }) => {
     />
   );
 };
+
+const ToolbarButton = memo(({
+  icon: Icon,
+  onClick,
+  title,
+}: {
+  icon: any;
+  onClick: () => void;
+  title: string;
+}) => (
+  <button
+    onClick={onClick}
+    className="p-1.5 text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition"
+    title={title}
+  >
+    <Icon size={16} />
+  </button>
+));
 
 const CodeBlock = ({ children, className, ...rest }: any) => {
   const [copied, setCopied] = useState(false);
@@ -546,24 +564,6 @@ function App() {
       insertText("  ");
     }
   };
-
-  const ToolbarButton = ({
-    icon: Icon,
-    onClick,
-    title,
-  }: {
-    icon: any;
-    onClick: () => void;
-    title: string;
-  }) => (
-    <button
-      onClick={onClick}
-      className="p-1.5 text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition"
-      title={title}
-    >
-      <Icon size={16} />
-    </button>
-  );
 
   const markdownComponents = useMemo(
     () => ({
