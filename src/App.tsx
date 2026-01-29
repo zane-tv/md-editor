@@ -32,19 +32,20 @@ import {
   Moon,
   Sun,
   Download,
-  Copy,
-  Check,
   FolderOpen,
   Save,
+  Share2,
 } from "lucide-react";
 import { useTranslation } from 'react-i18next';
+import i18next from 'i18next';
+
 import { revokeToken } from "./utils/googleClient";
 import { exportMarkdownToDocs } from "./utils/exportToDocs";
 import { generateShareUrl, checkUrlForSharedContent, getViewModeFromUrl } from "./utils/urlShare";
 import { TableOfContents } from "./components/TableOfContents";
 import { getTextFromChildren, slugify } from "./utils/slugify";
-import i18next from 'i18next';
-import { Share2 } from "lucide-react";
+import ToolbarButton from "./components/ToolbarButton";
+import CodeBlock from "./components/CodeBlock";
 
 // Initialize mermaid
 mermaid.initialize({
@@ -97,55 +98,6 @@ const Mermaid = ({ chart, darkMode }: { chart: string; darkMode: boolean }) => {
       ref={containerRef}
       className="mermaid-wrapper flex justify-center my-6"
     />
-  );
-};
-
-const CodeBlock = ({ children, className, ...rest }: any) => {
-  const [copied, setCopied] = useState(false);
-  const code = String(children).replace(/\n$/, "");
-
-  // Detect block vs inline
-  // Blocks from markdown usually end with a newline (thanks to react-markdown parser behavior for fenced blocks)
-  // or they have a language class (className)
-  const isBlock = className || String(children).endsWith("\n");
-  const isInline = !isBlock;
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  if (isInline) {
-    return (
-      <code className={className} {...rest}>
-        {children}
-      </code>
-    );
-  }
-
-  return (
-    <div className="relative group">
-      {/* Only show copy button if language is specified (className exists) */}
-      {className && (
-        <button
-          onClick={handleCopy}
-          className="absolute right-2 top-2 p-1.5 rounded-md bg-neutral-800/10 hover:bg-neutral-800/20 dark:bg-white/10 dark:hover:bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"
-          title="Copy code"
-        >
-          {copied ? (
-            <Check size={14} className="text-green-600" />
-          ) : (
-            <Copy size={14} className="text-neutral-500" />
-          )}
-        </button>
-      )}
-      <pre className="!mt-0 !mb-0 overflow-auto">
-        <code className={className} {...rest}>
-          {children}
-        </code>
-      </pre>
-    </div>
   );
 };
 
@@ -490,11 +442,11 @@ function App() {
     }, 50);
   };
 
-  const insertText = (before: string, after: string = "") => {
+  const insertText = useCallback((before: string, after: string = "") => {
     if (!textareaRef.current) return;
     const start = textareaRef.current.selectionStart;
     const end = textareaRef.current.selectionEnd;
-    const text = markdown;
+    const text = textareaRef.current.value;
     const selectedText = text.substring(start, end);
     const newText =
       text.substring(0, start) +
@@ -512,7 +464,7 @@ function App() {
         );
       }
     }, 0);
-  };
+  }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.ctrlKey || e.metaKey) {
@@ -546,24 +498,6 @@ function App() {
       insertText("  ");
     }
   };
-
-  const ToolbarButton = ({
-    icon: Icon,
-    onClick,
-    title,
-  }: {
-    icon: any;
-    onClick: () => void;
-    title: string;
-  }) => (
-    <button
-      onClick={onClick}
-      className="p-1.5 text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition"
-      title={title}
-    >
-      <Icon size={16} />
-    </button>
-  );
 
   const markdownComponents = useMemo(
     () => ({
