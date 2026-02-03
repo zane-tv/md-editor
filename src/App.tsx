@@ -45,6 +45,7 @@ import { TableOfContents } from "./components/TableOfContents";
 import { getTextFromChildren, slugify } from "./utils/slugify";
 import i18next from 'i18next';
 import { Share2 } from "lucide-react";
+import { ToolbarButton } from "./components/ToolbarButton";
 
 // Initialize mermaid
 mermaid.initialize({
@@ -490,11 +491,11 @@ function App() {
     }, 50);
   };
 
-  const insertText = (before: string, after: string = "") => {
+  const insertText = useCallback((before: string, after: string = "") => {
     if (!textareaRef.current) return;
     const start = textareaRef.current.selectionStart;
     const end = textareaRef.current.selectionEnd;
-    const text = markdown;
+    const text = textareaRef.current.value;
     const selectedText = text.substring(start, end);
     const newText =
       text.substring(0, start) +
@@ -512,7 +513,7 @@ function App() {
         );
       }
     }, 0);
-  };
+  }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.ctrlKey || e.metaKey) {
@@ -547,23 +548,6 @@ function App() {
     }
   };
 
-  const ToolbarButton = ({
-    icon: Icon,
-    onClick,
-    title,
-  }: {
-    icon: any;
-    onClick: () => void;
-    title: string;
-  }) => (
-    <button
-      onClick={onClick}
-      className="p-1.5 text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition"
-      title={title}
-    >
-      <Icon size={16} />
-    </button>
-  );
 
   const markdownComponents = useMemo(
     () => ({
