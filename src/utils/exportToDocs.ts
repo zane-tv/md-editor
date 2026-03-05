@@ -88,7 +88,7 @@ export async function exportMarkdownToDocs(markdown: string, title: string) {
   const nodeImageMap = new Map<any, string>();
   for (let i = 0; i < mermaidNodes.length; i++) {
     try {
-      const blob = await captureElement('.mermaid-wrapper', i);
+      const blob = await captureElement('.mermaid-wrapper-container', i);
       const url = await uploadImageToDrive(blob);
       nodeImageMap.set(mermaidNodes[i], url);
     } catch (e) {

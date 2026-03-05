@@ -163,7 +163,7 @@ html.dark .prose blockquote {
 }
 
 /* Remove background and padding from pre tags containing mermaid diagrams */
-.prose pre:has(.mermaid-wrapper) {
+.prose pre:has(.mermaid-wrapper-container) {
   background-color: transparent !important;
   padding: 0 !important;
   margin: 0 !important;
