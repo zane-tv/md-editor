@@ -19,6 +19,8 @@
     },
     "actions": {
       "openFile": "Open File",
+      "openDrive": "Open from Google Drive",
+      "saveDrive": "Save to Google Drive",
       "save": "Save",
       "saveAs": "Save As",
       "downloadMarkdown": "Download Markdown",
