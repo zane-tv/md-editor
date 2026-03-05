@@ -40,9 +40,12 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize,
+  DownloadCloud,
+  UploadCloud,
 } from "lucide-react";
 import { useTranslation } from 'react-i18next';
 import { revokeToken } from "./utils/googleClient";
+import { loadGooglePickerScript, downloadDriveFile, createDriveFile, updateDriveFile,   } from "./utils/googleDriveApi";
 import { exportMarkdownToDocs } from "./utils/exportToDocs";
 import { generateShareUrl, checkUrlForSharedContent, getViewModeFromUrl } from "./utils/urlShare";
 import { TableOfContents } from "./components/TableOfContents";
@@ -242,6 +245,8 @@ function App() {
   const [createdDocId, setCreatedDocId] = useState<string | null>(null);
   const [showNewFileConfirm, setShowNewFileConfirm] = useState(false);
   const [fileHandle, setFileHandle] = useState<any>(null);
+  const [driveFileId, setDriveFileId] = useState<string | null>(null);
+  const [driveFileName, setDriveFileName] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -437,6 +442,8 @@ function App() {
   const confirmNewFile = () => {
     setMarkdown("");
     setFileHandle(null);
+    setDriveFileId(null);
+    setDriveFileName(null);
     setShowNewFileConfirm(false);
     if (textareaRef.current) textareaRef.current.focus();
   };
@@ -459,6 +466,8 @@ function App() {
       const contents = await file.text();
       setMarkdown(contents);
       setFileHandle(handle);
+      setDriveFileId(null);
+      setDriveFileName(null);
       setStatusMsg(t('app.status.opened', { file: file.name }));
       setTimeout(() => setStatusMsg(""), 3000);
     } catch (err) {
@@ -479,6 +488,99 @@ function App() {
       setTimeout(() => setStatusMsg(""), 2000);
     } catch (err) {
       console.error(err);
+      setStatusMsg(t('app.status.saveFailed'));
+    }
+  };
+
+  const ensureGoogleAuth = async (): Promise<string | null> => {
+    const savedExpiry = localStorage.getItem("google_token_expiry");
+    const isExpired = savedExpiry ? Date.now() >= parseInt(savedExpiry) : true;
+
+    if (!accessToken || isExpired) {
+      return new Promise((resolve) => {
+        if (tokenClient) {
+          tokenClient.callback = (resp: any) => {
+            if (resp.error) {
+              resolve(null);
+              return;
+            }
+            setAccessToken(resp.access_token);
+            const expiry = Date.now() + resp.expires_in * 1000;
+            localStorage.setItem("google_access_token", resp.access_token);
+            localStorage.setItem("google_token_expiry", expiry.toString());
+            resolve(resp.access_token);
+          };
+          tokenClient.requestAccessToken({ prompt: "consent" });
+        } else {
+          resolve(null);
+        }
+      });
+    }
+    return accessToken;
+  };
+
+  const handleOpenFromDrive = async () => {
+    const token = await ensureGoogleAuth();
+    if (!token) return;
+
+    try {
+      await loadGooglePickerScript();
+
+      const picker = new (window as any).google.picker.PickerBuilder()
+        .addView(new (window as any).google.picker.DocsView().setIncludeFolders(true).setMimeTypes('text/markdown,text/plain'))
+        .setOAuthToken(token)
+        .setDeveloperKey(apiKey)
+        .setCallback(async (data: any) => {
+          if (data.action === (window as any).google.picker.Action.PICKED) {
+            const file = data.docs[0];
+            setStatusMsg(t('common.loading'));
+            try {
+              const content = await downloadDriveFile(file.id, token);
+              setMarkdown(content);
+              setDriveFileId(file.id);
+              setDriveFileName(file.name);
+              setFileHandle(null); // Clear local file handle
+              setStatusMsg(t('app.status.opened', { file: file.name }));
+              setTimeout(() => setStatusMsg(""), 3000);
+            } catch (err) {
+              console.error(err);
+              setStatusMsg(t('common.failed'));
+            }
+          }
+        })
+        .build();
+
+      picker.setVisible(true);
+    } catch (err) {
+      console.error('Error loading picker', err);
+    }
+  };
+
+  const handleSaveToDrive = async () => {
+    const token = await ensureGoogleAuth();
+    if (!token) return;
+
+    setStatusMsg(t('common.loading'));
+    try {
+      if (driveFileId) {
+        await updateDriveFile(driveFileId, markdown, token);
+        setStatusMsg(t('app.status.saved'));
+      } else {
+        const defaultName = prompt("Enter file name:", driveFileName || "Untitled.md");
+        if (!defaultName) {
+          setStatusMsg("");
+          return;
+        }
+
+        const finalName = defaultName.endsWith('.md') ? defaultName : `${defaultName}.md`;
+        const newId = await createDriveFile(finalName, markdown, token);
+        setDriveFileId(newId);
+        setDriveFileName(finalName);
+        setStatusMsg(t('app.status.saved'));
+      }
+      setTimeout(() => setStatusMsg(""), 2000);
+    } catch (err) {
+      console.error('Error saving to drive', err);
       setStatusMsg(t('app.status.saveFailed'));
     }
   };
@@ -575,9 +677,19 @@ function App() {
           e.preventDefault();
           insertText("[", "](url)");
           break;
+        case "o":
+          if (e.shiftKey) {
+            e.preventDefault();
+            handleOpenFromDrive();
+          }
+          break;
         case "s":
           e.preventDefault();
-          handleSaveFile();
+          if (e.shiftKey) {
+            handleSaveToDrive();
+          } else {
+            handleSaveFile();
+          }
           break;
         case "p":
           e.preventDefault();
@@ -724,6 +836,21 @@ function App() {
             title={fileHandle ? t('app.actions.save') : t('app.actions.saveAs')}
           >
             <Save size={20} />
+          </button>
+          <div className="w-px h-5 bg-neutral-300 mx-1"></div>
+          <button
+            onClick={handleOpenFromDrive}
+            className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
+            title={`${t('app.actions.openDrive')} (Ctrl+Shift+O)`}
+          >
+            <DownloadCloud size={20} />
+          </button>
+          <button
+            onClick={handleSaveToDrive}
+            className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
+            title={`${t('app.actions.saveDrive')} (Ctrl+Shift+S)`}
+          >
+            <UploadCloud size={20} />
           </button>
         </div>
 

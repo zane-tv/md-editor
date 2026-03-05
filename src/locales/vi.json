@@ -19,6 +19,8 @@
     },
     "actions": {
       "openFile": "Mở file",
+      "openDrive": "Mở từ Google Drive",
+      "saveDrive": "Lưu lên Google Drive",
       "save": "Lưu",
       "saveAs": "Lưu thành",
       "downloadMarkdown": "Tải về Markdown",
