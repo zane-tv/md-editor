@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import mermaid from "mermaid";
+import { TransformWrapper, TransformComponent, useControls } from "react-zoom-pan-pinch";
 import {
   FileDown,
   Eye,
@@ -36,6 +37,9 @@ import {
   Check,
   FolderOpen,
   Save,
+  ZoomIn,
+  ZoomOut,
+  Maximize,
 } from "lucide-react";
 import { useTranslation } from 'react-i18next';
 import { revokeToken } from "./utils/googleClient";
@@ -53,6 +57,35 @@ mermaid.initialize({
   securityLevel: "loose",
   fontFamily: "Inter, sans-serif",
 });
+
+const MermaidControls = () => {
+  const { zoomIn, zoomOut, resetTransform } = useControls();
+  return (
+    <div className="absolute top-2 right-2 flex gap-1 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm p-1 rounded-md shadow-sm border dark:border-neutral-700 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+      <button
+        onClick={() => zoomIn()}
+        className="p-1.5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition"
+        title="Zoom In"
+      >
+        <ZoomIn size={16} />
+      </button>
+      <button
+        onClick={() => zoomOut()}
+        className="p-1.5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition"
+        title="Zoom Out"
+      >
+        <ZoomOut size={16} />
+      </button>
+      <button
+        onClick={() => resetTransform()}
+        className="p-1.5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition"
+        title="Reset"
+      >
+        <Maximize size={16} />
+      </button>
+    </div>
+  );
+};
 
 const Mermaid = ({ chart, darkMode }: { chart: string; darkMode: boolean }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -93,10 +126,23 @@ const Mermaid = ({ chart, darkMode }: { chart: string; darkMode: boolean }) => {
   }, [chartWithTheme]);
 
   return (
-    <div
-      ref={containerRef}
-      className="mermaid-wrapper flex justify-center my-6"
-    />
+    <div className="relative group mermaid-wrapper-container my-6 border border-transparent hover:border-neutral-200 dark:hover:border-neutral-700 rounded-lg overflow-hidden transition-colors">
+      <TransformWrapper
+        initialScale={1}
+        minScale={0.1}
+        maxScale={8}
+        centerZoomedOut={true}
+        wheel={{ step: 0.1 }}
+      >
+        <MermaidControls />
+        <TransformComponent wrapperClass="!w-full !h-full bg-white dark:bg-neutral-900" contentClass="!w-full !h-full flex items-center justify-center min-h-[200px]">
+          <div
+            ref={containerRef}
+            className="mermaid-wrapper flex justify-center w-full h-full p-4"
+          />
+        </TransformComponent>
+      </TransformWrapper>
+    </div>
   );
 };
 
