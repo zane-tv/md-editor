@@ -34,6 +34,14 @@ export const generateShareUrl = (content: string, viewMode?: string): string => 
  */
 export const shortenUrl = async (longUrl: string): Promise<string> => {
   try {
+    // LNK API requires valid URLs starting with http:// or https://
+    // If we're running locally without http/https (e.g., file:// or some local test env),
+    // the API will reject it with "The link field must be a valid URL."
+    if (!longUrl.startsWith('http://') && !longUrl.startsWith('https://')) {
+      console.warn('LNK API requires a valid http/https URL. Skipping shortening.');
+      return longUrl;
+    }
+
     const apiKey = import.meta.env.VITE_LNK_API_KEY || 'public';
     const response = await fetch('https://lnk.ua/api/v1/link/create', {
       method: 'POST',
@@ -44,12 +52,18 @@ export const shortenUrl = async (longUrl: string): Promise<string> => {
       body: JSON.stringify({ link: longUrl }),
     });
 
-    if (!response.ok) {
-      console.error('Failed to shorten link via LNK API. Status:', response.status);
-      return longUrl;
+    const data = await response.json();
+
+    // Check if the API returned a validation error (e.g. 422 Unprocessable Entity, or error inside 'result')
+    if (data && data.result && data.result.errors) {
+       console.error('LNK API Validation Error:', data.result.message || data.result.errors);
+       return longUrl;
     }
 
-    const data = await response.json();
+    if (!response.ok) {
+      console.error('Failed to shorten link via LNK API. Status:', response.status, data);
+      return longUrl;
+    }
 
     if (data && data.result && data.result.lnk) {
       return data.result.lnk;
