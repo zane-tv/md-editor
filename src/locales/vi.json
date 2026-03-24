@@ -44,7 +44,8 @@
       "opened": "Đã mở: {{file}}",
       "saved": "Đã lưu!",
       "saveFailed": "Lưu thất bại",
-      "markdownFile": "Tập tin Markdown"
+      "markdownFile": "Tập tin Markdown",
+      "generatingLink": "Đang tạo link rút gọn..."
     },
     "editor": {
       "placeholder": "Nhập markdown của bạn ở đây..."

@@ -29,6 +29,41 @@ export const generateShareUrl = (content: string, viewMode?: string): string => 
 };
 
 /**
+ * Shortens a URL using LNK API.
+ * Falls back to the original URL if the API request fails.
+ */
+export const shortenUrl = async (longUrl: string): Promise<string> => {
+  try {
+    const apiKey = import.meta.env.VITE_LNK_API_KEY || 'public';
+    const response = await fetch('https://lnk.ua/api/v1/link/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ link: longUrl }),
+    });
+
+    if (!response.ok) {
+      console.error('Failed to shorten link via LNK API. Status:', response.status);
+      return longUrl;
+    }
+
+    const data = await response.json();
+
+    if (data && data.result && data.result.lnk) {
+      return data.result.lnk;
+    }
+
+    console.error('Invalid response format from LNK API:', data);
+    return longUrl;
+  } catch (error) {
+    console.error('Error shortening link:', error);
+    return longUrl;
+  }
+};
+
+/**
  * Checks the URL for shared content and returns it if present.
  */
 export const checkUrlForSharedContent = (): string | null => {
