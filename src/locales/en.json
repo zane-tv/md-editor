@@ -44,7 +44,8 @@
       "opened": "Opened: {{file}}",
       "saved": "Saved!",
       "saveFailed": "Save failed",
-      "markdownFile": "Markdown Files"
+      "markdownFile": "Markdown Files",
+      "generatingLink": "Generating short link..."
     },
     "editor": {
       "placeholder": "Type your markdown here..."

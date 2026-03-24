@@ -47,7 +47,7 @@ import { useTranslation } from 'react-i18next';
 import { revokeToken } from "./utils/googleClient";
 import { loadGooglePickerScript, downloadDriveFile, createDriveFile, updateDriveFile,   } from "./utils/googleDriveApi";
 import { exportMarkdownToDocs } from "./utils/exportToDocs";
-import { generateShareUrl, checkUrlForSharedContent, getViewModeFromUrl } from "./utils/urlShare";
+import { generateShareUrl, checkUrlForSharedContent, getViewModeFromUrl, shortenUrl } from "./utils/urlShare";
 import { TableOfContents } from "./components/TableOfContents";
 import { getTextFromChildren, slugify } from "./utils/slugify";
 import i18next from 'i18next';
@@ -423,15 +423,18 @@ function App() {
     }, 500);
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
     try {
+      setStatusMsg(t('app.status.generatingLink', 'Đang tạo link...')); // fallback text just in case
       const url = generateShareUrl(markdown, view);
-      navigator.clipboard.writeText(url);
+      const shortUrl = await shortenUrl(url);
+      await navigator.clipboard.writeText(shortUrl);
       setStatusMsg(t('app.status.linkCopied'));
       setTimeout(() => setStatusMsg(""), 3000);
     } catch (error) {
       console.error(error);
       setStatusMsg(t('app.status.linkGeneratedError'));
+      setTimeout(() => setStatusMsg(""), 3000);
     }
   };
 
