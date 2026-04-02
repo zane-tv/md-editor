@@ -42,16 +42,18 @@ import {
   Maximize,
   DownloadCloud,
   UploadCloud,
+  Share2,
 } from "lucide-react";
 import { useTranslation } from 'react-i18next';
 import { revokeToken } from "./utils/googleClient";
 import { loadGooglePickerScript, downloadDriveFile, createDriveFile, updateDriveFile,   } from "./utils/googleDriveApi";
 import { exportMarkdownToDocs } from "./utils/exportToDocs";
-import { generateShareUrl, checkUrlForSharedContent, getViewModeFromUrl, shortenUrl } from "./utils/urlShare";
+import { generateShareUrl, checkUrlForSharedContent, getShareIdFromUrl, getViewModeFromUrl } from "./utils/urlShare";
+import { SHARE_TOO_LARGE_ERROR, createShare, loadShare, type ShareViewMode } from "./utils/shareStore";
+import { isSupabaseConfigured } from "./utils/supabase";
 import { TableOfContents } from "./components/TableOfContents";
 import { getTextFromChildren, slugify } from "./utils/slugify";
 import i18next from 'i18next';
-import { Share2 } from "lucide-react";
 
 // Initialize mermaid
 mermaid.initialize({
@@ -66,6 +68,7 @@ const MermaidControls = () => {
   return (
     <div className="absolute top-2 right-2 flex gap-1 bg-white/80 dark:bg-neutral-800/80 backdrop-blur-sm p-1 rounded-md shadow-sm border dark:border-neutral-700 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
       <button
+        type="button"
         onClick={() => zoomIn()}
         className="p-1.5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition"
         title="Zoom In"
@@ -73,6 +76,7 @@ const MermaidControls = () => {
         <ZoomIn size={16} />
       </button>
       <button
+        type="button"
         onClick={() => zoomOut()}
         className="p-1.5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition"
         title="Zoom Out"
@@ -80,6 +84,7 @@ const MermaidControls = () => {
         <ZoomOut size={16} />
       </button>
       <button
+        type="button"
         onClick={() => resetTransform()}
         className="p-1.5 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition"
         title="Reset"
@@ -126,7 +131,7 @@ const Mermaid = ({ chart, darkMode }: { chart: string; darkMode: boolean }) => {
     };
 
     render();
-  }, [chartWithTheme]);
+  }, [chart, chartWithTheme]);
 
   return (
     <div className="relative group mermaid-wrapper-container my-6 border border-transparent hover:border-neutral-200 dark:hover:border-neutral-700 rounded-lg overflow-hidden transition-colors">
@@ -178,6 +183,7 @@ const CodeBlock = ({ children, className, ...rest }: any) => {
       {/* Only show copy button if language is specified (className exists) */}
       {className && (
         <button
+          type="button"
           onClick={handleCopy}
           className="absolute right-2 top-2 p-1.5 rounded-md bg-neutral-800/10 hover:bg-neutral-800/20 dark:bg-white/10 dark:hover:bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"
           title="Copy code"
@@ -198,12 +204,23 @@ const CodeBlock = ({ children, className, ...rest }: any) => {
   );
 };
 
+type ViewMode = ShareViewMode;
+type SharedLinkState = 'idle' | 'loading' | 'ready' | 'expired' | 'notFound' | 'error';
+
+const isViewMode = (value: string | null): value is ViewMode => {
+  return value === 'split' || value === 'edit' || value === 'preview';
+};
+
 function App() {
   const { t, i18n } = useTranslation();
+  const initialLegacySharedContent = useMemo(() => checkUrlForSharedContent(), []);
+  const sharedLinkId = useMemo(() => getShareIdFromUrl(), []);
+  const initialViewModeFromUrl = useMemo(() => getViewModeFromUrl(), []);
+  const hasExplicitViewMode = isViewMode(initialViewModeFromUrl);
+
   const [markdown, setMarkdown] = useState(() => {
-    // Check for shared content first
-    const shared = checkUrlForSharedContent();
-    if (shared) return shared;
+    if (sharedLinkId) return "";
+    if (initialLegacySharedContent) return initialLegacySharedContent;
     return i18next.t('defaultContent');
   });
   // Debounce markdown for preview to improve performance
@@ -214,11 +231,11 @@ function App() {
     return () => clearTimeout(timer);
   }, [markdown]);
 
-  const [view, setView] = useState<"split" | "edit" | "preview">(() => {
-    const sharedView = getViewModeFromUrl();
-    if (sharedView === 'edit' || sharedView === 'preview' || sharedView === 'split') {
-      return sharedView;
+  const [view, setView] = useState<ViewMode>(() => {
+    if (isViewMode(initialViewModeFromUrl)) {
+      return initialViewModeFromUrl;
     }
+    if (sharedLinkId || initialLegacySharedContent) return 'preview';
     return "split";
   });
   const [darkMode, setDarkMode] = useState(
@@ -243,6 +260,9 @@ function App() {
   const [isExporting, setIsExporting] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
   const [createdDocId, setCreatedDocId] = useState<string | null>(null);
+  const [sharedLinkState, setSharedLinkState] = useState<SharedLinkState>(() =>
+    sharedLinkId ? 'loading' : 'idle'
+  );
   const [showNewFileConfirm, setShowNewFileConfirm] = useState(false);
   const [fileHandle, setFileHandle] = useState<any>(null);
   const [driveFileId, setDriveFileId] = useState<string | null>(null);
@@ -262,6 +282,48 @@ function App() {
       localStorage.setItem("theme", "light");
     }
   }, [darkMode]);
+
+  useEffect(() => {
+    if (!sharedLinkId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    setSharedLinkState('loading');
+
+    loadShare(sharedLinkId)
+      .then((result) => {
+        if (cancelled) {
+          return;
+        }
+
+        if (result.status === 'ready') {
+          setMarkdown(result.share.markdown);
+          if (!hasExplicitViewMode) {
+            setView(result.share.viewMode);
+          }
+          setSharedLinkState('ready');
+          return;
+        }
+
+        setMarkdown('');
+        setSharedLinkState(result.status === 'expired' ? 'expired' : 'notFound');
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+
+        console.error('Failed to load shared link', error);
+        setMarkdown('');
+        setSharedLinkState('error');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [hasExplicitViewMode, sharedLinkId]);
 
   const startResizing = useCallback(() => {
     setIsResizing(true);
@@ -424,16 +486,26 @@ function App() {
   };
 
   const handleShare = async () => {
+    if (!isSupabaseConfigured()) {
+      setStatusMsg(t('app.status.shareNotConfigured'));
+      setTimeout(() => setStatusMsg(""), 3000);
+      return;
+    }
+
     try {
-      setStatusMsg(t('app.status.generatingLink', 'Đang tạo link...')); // fallback text just in case
-      const url = generateShareUrl(markdown, view);
-      const shortUrl = await shortenUrl(url);
-      await navigator.clipboard.writeText(shortUrl);
+      setStatusMsg(t('app.status.generatingLink', 'Đang tạo link...'));
+      const shareId = await createShare(markdown, view);
+      const url = generateShareUrl(shareId, view);
+      await navigator.clipboard.writeText(url);
       setStatusMsg(t('app.status.linkCopied'));
       setTimeout(() => setStatusMsg(""), 3000);
     } catch (error) {
       console.error(error);
-      setStatusMsg(t('app.status.linkGeneratedError'));
+      if (error instanceof Error && error.message === SHARE_TOO_LARGE_ERROR) {
+        setStatusMsg(t('app.status.shareTooLarge'));
+      } else {
+        setStatusMsg(t('app.status.linkGeneratedError'));
+      }
       setTimeout(() => setStatusMsg(""), 3000);
     }
   };
@@ -718,6 +790,7 @@ function App() {
     title: string;
   }) => (
     <button
+      type="button"
       onClick={onClick}
       className="p-1.5 text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded transition"
       title={title}
@@ -789,6 +862,39 @@ function App() {
     [darkMode]
   );
 
+  const sharedLinkPlaceholder = (() => {
+    switch (sharedLinkState) {
+      case 'loading':
+        return {
+          title: t('app.share.loadingTitle'),
+          message: t('app.share.loadingMessage'),
+          tone: 'loading',
+        };
+      case 'expired':
+        return {
+          title: t('app.share.expiredTitle'),
+          message: t('app.share.expiredMessage'),
+          tone: 'danger',
+        };
+      case 'notFound':
+        return {
+          title: t('app.share.notFoundTitle'),
+          message: t('app.share.notFoundMessage'),
+          tone: 'danger',
+        };
+      case 'error':
+        return {
+          title: t('app.share.errorTitle'),
+          message: t('app.share.errorMessage'),
+          tone: 'danger',
+        };
+      default:
+        return null;
+    }
+  })();
+
+  const shouldShowSharedLinkPlaceholder = Boolean(sharedLinkId && sharedLinkState !== 'ready');
+
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 flex flex-col relative transition-colors duration-300">
       {/* Confirm New File Modal */}
@@ -803,12 +909,14 @@ function App() {
             </p>
             <div className="flex justify-end gap-2">
               <button
+                type="button"
                 onClick={() => setShowNewFileConfirm(false)}
                 className="px-4 py-2 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg text-sm font-medium"
               >
                 {t('common.cancel')}
               </button>
               <button
+                type="button"
                 onClick={confirmNewFile}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium"
               >
@@ -827,6 +935,7 @@ function App() {
 
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={handleOpenFile}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
             title={t('app.actions.openFile')}
@@ -834,6 +943,7 @@ function App() {
             <FolderOpen size={20} />
           </button>
           <button
+            type="button"
             onClick={handleSaveFile}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
             title={fileHandle ? t('app.actions.save') : t('app.actions.saveAs')}
@@ -842,6 +952,7 @@ function App() {
           </button>
           <div className="w-px h-5 bg-neutral-300 mx-1"></div>
           <button
+            type="button"
             onClick={handleOpenFromDrive}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
             title={`${t('app.actions.openDrive')} (Ctrl+Shift+O)`}
@@ -849,6 +960,7 @@ function App() {
             <DownloadCloud size={20} />
           </button>
           <button
+            type="button"
             onClick={handleSaveToDrive}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
             title={`${t('app.actions.saveDrive')} (Ctrl+Shift+S)`}
@@ -859,6 +971,7 @@ function App() {
 
         <div className="flex items-center gap-2 bg-neutral-100 p-1 rounded-lg">
           <button
+            type="button"
             onClick={() => setView("edit")}
             className={`px-3 py-1 rounded-md text-sm transition ${
               view === "edit"
@@ -869,6 +982,7 @@ function App() {
             <Code size={16} className="inline mr-1" /> {t('app.view.edit')}
           </button>
           <button
+            type="button"
             onClick={() => setView("split")}
             className={`px-3 py-1 rounded-md text-sm transition ${
               view === "split"
@@ -879,6 +993,7 @@ function App() {
             {t('app.view.split')}
           </button>
           <button
+            type="button"
             onClick={() => setView("preview")}
             className={`px-3 py-1 rounded-md text-sm transition ${
               view === "preview"
@@ -909,6 +1024,7 @@ function App() {
             )}
             {createdDocId && (
               <button
+                type="button"
                 onClick={() => {
                   setCreatedDocId(null);
                   setStatusMsg("");
@@ -922,6 +1038,7 @@ function App() {
           <div className="h-6 w-px bg-neutral-200 mx-1"></div>
 
           <button
+            type="button"
             onClick={toggleLanguage}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition font-mono text-sm font-bold"
             title={i18n.language === 'vi' ? 'Switch to English' : 'Chuyển sang Tiếng Việt'}
@@ -930,6 +1047,7 @@ function App() {
           </button>
 
           <button
+            type="button"
             onClick={toggleDarkMode}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
             title={darkMode ? t('app.theme.light') : t('app.theme.dark')}
@@ -937,6 +1055,7 @@ function App() {
             {darkMode ? <Sun size={20} /> : <Moon size={20} />}
           </button>
           <button
+            type="button"
             onClick={handleDownloadMD}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
             title={t('app.actions.downloadMarkdown')}
@@ -944,6 +1063,7 @@ function App() {
             <Download size={20} />
           </button>
           <button
+            type="button"
             onClick={handlePrintPDF}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
             title={t('app.actions.print')}
@@ -951,6 +1071,7 @@ function App() {
             <Printer size={20} />
           </button>
           <button
+            type="button"
             onClick={handleShare}
             className="p-2 text-neutral-600 hover:bg-neutral-100 rounded-full transition"
             title={t('app.actions.share')}
@@ -961,6 +1082,7 @@ function App() {
           {isInitialized ? (
             !accessToken ? (
               <button
+                type="button"
                 onClick={handleAuth}
                 className="flex items-center gap-2 bg-white border border-neutral-200 hover:bg-neutral-50 text-neutral-700 px-4 py-2 rounded-lg font-medium transition text-sm shadow-sm"
               >
@@ -972,6 +1094,7 @@ function App() {
                   {t('app.actions.connected')}
                 </span>
                 <button
+                  type="button"
                   onClick={handleLogout}
                   className="p-2 text-neutral-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"
                   title={t('app.actions.logout')}
@@ -979,6 +1102,7 @@ function App() {
                   <LogOut size={18} />
                 </button>
                 <button
+                  type="button"
                   onClick={handleExport}
                   disabled={isExporting}
                   className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm disabled:opacity-50"
@@ -996,175 +1120,199 @@ function App() {
         </div>
       </header>
 
-      <main
-        ref={mainRef}
-        className="flex-1 flex overflow-hidden"
-        style={{ userSelect: isResizing ? "none" : "auto" }}
-      >
-        {(view === "split" || view === "edit") && (
-          <div
-            className={`editor-pane border-r bg-white flex flex-col ${
-              view !== "split" ? "flex-1" : ""
-            } ${view === "edit" ? "max-w-5xl mx-auto border-x" : ""}`}
-            style={
-              view === "split" ? { width: `${editorWidth}%`, flex: "none" } : {}
-            }
-          >
-            {/* Toolbar */}
-            <div className="toolbar h-10 border-b flex items-center px-4 gap-1 bg-white sticky top-0 overflow-x-auto transition-colors duration-300">
-              <ToolbarButton
-                icon={FilePlus}
-                onClick={handleNewFile}
-                title={t('app.toolbar.newFile')}
-              />
-              <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
-
-              <ToolbarButton
-                icon={Bold}
-                onClick={() => insertText("**", "**")}
-                title={t('app.toolbar.bold')}
-              />
-              <ToolbarButton
-                icon={Italic}
-                onClick={() => insertText("*", "*")}
-                title={t('app.toolbar.italic')}
-              />
-              <ToolbarButton
-                icon={Strikethrough}
-                onClick={() => insertText("~~", "~~")}
-                title={t('app.toolbar.strikethrough')}
-              />
-              <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
-
-              <ToolbarButton
-                icon={Heading1}
-                onClick={() => insertText("# ")}
-                title={t('app.toolbar.h1')}
-              />
-              <ToolbarButton
-                icon={Heading2}
-                onClick={() => insertText("## ")}
-                title={t('app.toolbar.h2')}
-              />
-              <ToolbarButton
-                icon={Heading3}
-                onClick={() => insertText("### ")}
-                title={t('app.toolbar.h3')}
-              />
-              <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
-
-              <ToolbarButton
-                icon={List}
-                onClick={() => insertText("- ")}
-                title={t('app.toolbar.list')}
-              />
-              <ToolbarButton
-                icon={ListOrdered}
-                onClick={() => insertText("1. ")}
-                title={t('app.toolbar.orderedList')}
-              />
-              <ToolbarButton
-                icon={CheckSquare}
-                onClick={() => insertText("- [ ] ")}
-                title={t('app.toolbar.taskList')}
-              />
-              <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
-
-              <ToolbarButton
-                icon={Quote}
-                onClick={() => insertText("> ")}
-                title={t('app.toolbar.quote')}
-              />
-              <ToolbarButton
-                icon={Minus}
-                onClick={() => insertText("---\n")}
-                title={t('app.toolbar.horizontalRule')}
-              />
-              <ToolbarButton
-                icon={Table}
-                onClick={() =>
-                  insertText(
-                    "| Header 1 | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |"
-                  )
-                }
-                title={t('app.toolbar.table')}
-              />
-              <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
-
-              <ToolbarButton
-                icon={Link}
-                onClick={() => insertText("[", "](url)")}
-                title={t('app.toolbar.link')}
-              />
-              <ToolbarButton
-                icon={Image}
-                onClick={() => insertText("![Alt text]", "(url)")}
-                title={t('app.toolbar.image')}
-              />
-              <ToolbarButton
-                icon={Code2}
-                onClick={() => insertText("```\n", "\n```")}
-                title={t('app.toolbar.codeBlock')}
-              />
-              <ToolbarButton
-                icon={Network}
-                onClick={() =>
-                  insertText(
-                    "```mermaid\ngraph TD\n    A[Start] --> B[End]\n```"
-                  )
-                }
-                title={t('app.toolbar.mermaid')}
-              />
-            </div>
-
-            <textarea
-              ref={textareaRef}
-              value={markdown}
-              onChange={(e) => setMarkdown(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onScroll={handleEditorScroll}
-              className="w-full h-full p-8 font-mono text-sm resize-none focus:outline-none leading-relaxed text-neutral-800 bg-white"
-              placeholder={t('app.editor.placeholder')}
-            />
-          </div>
-        )}
-
-        {view === "split" && (
-          <div
-            className="w-1 bg-neutral-200 hover:bg-blue-400 cursor-col-resize transition-colors z-10 flex-shrink-0"
-            onMouseDown={startResizing}
-          />
-        )}
-
-        {(view === "split" || view === "preview") && (
-          <div className={`flex flex-1 overflow-hidden h-full relative ${view === "preview" ? "bg-neutral-100 dark:bg-neutral-900" : ""}`}>
-            {/* TOC Sidebar - Only in Preview Mode */}
-            {view === 'preview' && (
-              <div className="w-72 bg-neutral-50 dark:bg-neutral-900 border-r dark:border-neutral-700 overflow-y-auto hidden lg:block flex-shrink-0 h-full">
-                 <TableOfContents markdown={debouncedMarkdown} />
-              </div>
+      {shouldShowSharedLinkPlaceholder && sharedLinkPlaceholder ? (
+        <main
+          ref={mainRef}
+          className="flex-1 flex items-center justify-center px-6 bg-neutral-50 dark:bg-neutral-900"
+          style={{ userSelect: isResizing ? "none" : "auto" }}
+        >
+          <div className="w-full max-w-md rounded-2xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 p-8 text-center shadow-sm">
+            {sharedLinkPlaceholder.tone === 'loading' ? (
+              <Loader2 size={36} className="mx-auto mb-4 animate-spin text-blue-600" />
+            ) : (
+              <Share2 size={36} className="mx-auto mb-4 text-red-500" />
             )}
-
-            {/* Preview Content */}
+            <h2 className="text-xl font-semibold text-neutral-900 dark:text-white mb-2">
+              {sharedLinkPlaceholder.title}
+            </h2>
+            <p className="text-sm text-neutral-600 dark:text-neutral-300 leading-relaxed">
+              {sharedLinkPlaceholder.message}
+            </p>
+          </div>
+        </main>
+      ) : (
+        <main
+          ref={mainRef}
+          className="flex-1 flex overflow-hidden"
+          style={{ userSelect: isResizing ? "none" : "auto" }}
+        >
+          {(view === "split" || view === "edit") && (
             <div
-              ref={previewRef}
-              onScroll={handlePreviewScroll}
-              className={`preview-pane flex-1 overflow-y-auto bg-neutral-50 dark:bg-neutral-900`}
+              className={`editor-pane border-r bg-white flex flex-col ${
+                view !== "split" ? "flex-1" : ""
+              } ${view === "edit" ? "max-w-5xl mx-auto border-x" : ""}`}
+              style={
+                view === "split" ? { width: `${editorWidth}%`, flex: "none" } : {}
+              }
             >
-              <div className={`prose prose-neutral max-w-none bg-white dark:bg-neutral-800 min-h-full shadow-sm text-neutral-800 dark:text-neutral-100 ${
-                 view === "preview" ? "max-w-4xl mx-auto my-8 p-10 rounded-lg border dark:border-neutral-700" : "p-10"
-              }`}>
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={markdownComponents}
-                >
-                  {debouncedMarkdown}
-                </ReactMarkdown>
+              {/* Toolbar */}
+              <div className="toolbar h-10 border-b flex items-center px-4 gap-1 bg-white sticky top-0 overflow-x-auto transition-colors duration-300">
+                <ToolbarButton
+                  icon={FilePlus}
+                  onClick={handleNewFile}
+                  title={t('app.toolbar.newFile')}
+                />
+                <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
+
+                <ToolbarButton
+                  icon={Bold}
+                  onClick={() => insertText("**", "**")}
+                  title={t('app.toolbar.bold')}
+                />
+                <ToolbarButton
+                  icon={Italic}
+                  onClick={() => insertText("*", "*")}
+                  title={t('app.toolbar.italic')}
+                />
+                <ToolbarButton
+                  icon={Strikethrough}
+                  onClick={() => insertText("~~", "~~")}
+                  title={t('app.toolbar.strikethrough')}
+                />
+                <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
+
+                <ToolbarButton
+                  icon={Heading1}
+                  onClick={() => insertText("# ")}
+                  title={t('app.toolbar.h1')}
+                />
+                <ToolbarButton
+                  icon={Heading2}
+                  onClick={() => insertText("## ")}
+                  title={t('app.toolbar.h2')}
+                />
+                <ToolbarButton
+                  icon={Heading3}
+                  onClick={() => insertText("### ")}
+                  title={t('app.toolbar.h3')}
+                />
+                <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
+
+                <ToolbarButton
+                  icon={List}
+                  onClick={() => insertText("- ")}
+                  title={t('app.toolbar.list')}
+                />
+                <ToolbarButton
+                  icon={ListOrdered}
+                  onClick={() => insertText("1. ")}
+                  title={t('app.toolbar.orderedList')}
+                />
+                <ToolbarButton
+                  icon={CheckSquare}
+                  onClick={() => insertText("- [ ] ")}
+                  title={t('app.toolbar.taskList')}
+                />
+                <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
+
+                <ToolbarButton
+                  icon={Quote}
+                  onClick={() => insertText("> ")}
+                  title={t('app.toolbar.quote')}
+                />
+                <ToolbarButton
+                  icon={Minus}
+                  onClick={() => insertText("---\n")}
+                  title={t('app.toolbar.horizontalRule')}
+                />
+                <ToolbarButton
+                  icon={Table}
+                  onClick={() =>
+                    insertText(
+                      "| Header 1 | Header 2 |\n| --- | --- |\n| Cell 1 | Cell 2 |"
+                    )
+                  }
+                  title={t('app.toolbar.table')}
+                />
+                <div className="w-px h-4 bg-neutral-200 mx-1 flex-shrink-0"></div>
+
+                <ToolbarButton
+                  icon={Link}
+                  onClick={() => insertText("[", "](url)")}
+                  title={t('app.toolbar.link')}
+                />
+                <ToolbarButton
+                  icon={Image}
+                  onClick={() => insertText("![Alt text]", "(url)")}
+                  title={t('app.toolbar.image')}
+                />
+                <ToolbarButton
+                  icon={Code2}
+                  onClick={() => insertText("```\n", "\n```")}
+                  title={t('app.toolbar.codeBlock')}
+                />
+                <ToolbarButton
+                  icon={Network}
+                  onClick={() =>
+                    insertText(
+                      "```mermaid\ngraph TD\n    A[Start] --> B[End]\n```"
+                    )
+                  }
+                  title={t('app.toolbar.mermaid')}
+                />
+              </div>
+
+              <textarea
+                ref={textareaRef}
+                value={markdown}
+                onChange={(e) => setMarkdown(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onScroll={handleEditorScroll}
+                className="w-full h-full p-8 font-mono text-sm resize-none focus:outline-none leading-relaxed text-neutral-800 bg-white"
+                placeholder={t('app.editor.placeholder')}
+              />
+            </div>
+          )}
+
+          {view === "split" && (
+            <button
+              type="button"
+              aria-label={t('app.actions.resizePanels')}
+              className="w-1 bg-neutral-200 hover:bg-blue-400 cursor-col-resize transition-colors z-10 flex-shrink-0"
+              onMouseDown={startResizing}
+            />
+          )}
+
+          {(view === "split" || view === "preview") && (
+            <div className={`flex flex-1 overflow-hidden h-full relative ${view === "preview" ? "bg-neutral-100 dark:bg-neutral-900" : ""}`}>
+              {/* TOC Sidebar - Only in Preview Mode */}
+              {view === 'preview' && (
+                <div className="w-72 bg-neutral-50 dark:bg-neutral-900 border-r dark:border-neutral-700 overflow-y-auto hidden lg:block flex-shrink-0 h-full">
+                   <TableOfContents markdown={debouncedMarkdown} />
+                </div>
+              )}
+
+              {/* Preview Content */}
+              <div
+                ref={previewRef}
+                onScroll={handlePreviewScroll}
+                className={`preview-pane flex-1 overflow-y-auto bg-neutral-50 dark:bg-neutral-900`}
+              >
+                <div className={`prose prose-neutral max-w-none bg-white dark:bg-neutral-800 min-h-full shadow-sm text-neutral-800 dark:text-neutral-100 ${
+                   view === "preview" ? "max-w-4xl mx-auto my-8 p-10 rounded-lg border dark:border-neutral-700" : "p-10"
+                }`}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={markdownComponents}
+                  >
+                    {debouncedMarkdown}
+                  </ReactMarkdown>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </main>
+          )}
+        </main>
+      )}
     </div>
   );
 }

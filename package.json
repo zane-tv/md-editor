@@ -17,6 +17,7 @@
     "lucide-react": "^0.344.0",
     "lz-string": "^1.5.0",
     "mermaid": "^10.9.0",
+    "@supabase/supabase-js": "^2.49.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-i18next": "^16.5.2",

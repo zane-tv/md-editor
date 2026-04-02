@@ -30,12 +30,15 @@
       "logout": "Logout",
       "exportDocs": "Export Docs",
       "openGoogleDoc": "Open Google Doc",
-      "share": "Share"
+      "share": "Share",
+      "resizePanels": "Resize panels"
     },
     "status": {
       "initFailed": "Initialization failed. Check API Key.",
       "linkCopied": "Share link copied to clipboard!",
       "linkGeneratedError": "Error generating link.",
+       "shareNotConfigured": "Sharing is not configured.",
+       "shareTooLarge": "The document is too large to share.",
       "loggedOut": "Logged out",
       "preparingExport": "Preparing export...",
       "processingExport": "Capturing charts & Creating Doc...",
@@ -45,7 +48,17 @@
       "saved": "Saved!",
       "saveFailed": "Save failed",
       "markdownFile": "Markdown Files",
-      "generatingLink": "Generating short link..."
+      "generatingLink": "Generating share link..."
+    },
+    "share": {
+      "loadingTitle": "Loading shared document...",
+       "loadingMessage": "Fetching shared content.",
+      "expiredTitle": "This link has expired",
+      "expiredMessage": "Shared content is hidden after the first viewer has had access for 1 day.",
+      "notFoundTitle": "Link not found",
+      "notFoundMessage": "The shared document was deleted or the link is invalid.",
+      "errorTitle": "Unable to load shared link",
+       "errorMessage": "Check your sharing configuration and try again."
     },
     "editor": {
       "placeholder": "Type your markdown here..."

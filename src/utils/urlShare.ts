@@ -18,63 +18,25 @@ export const decompressFromPath = (compressed: string): string | null => {
 /**
  * Generates the full shareable URL.
  */
-export const generateShareUrl = (content: string, viewMode?: string): string => {
-  const compressed = compressToPath(content);
+export const generateShareUrl = (shareId: string, viewMode?: string): string => {
   const url = new URL(window.location.href);
-  url.searchParams.set('data', compressed);
+  url.searchParams.delete('data');
+  url.searchParams.delete('share');
+  url.searchParams.set('s', shareId);
   if (viewMode) {
     url.searchParams.set('view', viewMode);
+  } else {
+    url.searchParams.delete('view');
   }
   return url.toString();
 };
 
 /**
- * Shortens a URL using LNK API.
- * Falls back to the original URL if the API request fails.
+ * Gets the share id from the URL if present.
  */
-export const shortenUrl = async (longUrl: string): Promise<string> => {
-  try {
-    // LNK API requires valid URLs starting with http:// or https://
-    // If we're running locally without http/https (e.g., file:// or some local test env),
-    // the API will reject it with "The link field must be a valid URL."
-    if (!longUrl.startsWith('http://') && !longUrl.startsWith('https://')) {
-      console.warn('LNK API requires a valid http/https URL. Skipping shortening.');
-      return longUrl;
-    }
-
-    const apiKey = import.meta.env.VITE_LNK_API_KEY || 'public';
-    const response = await fetch('https://lnk.ua/api/v1/link/create', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ link: longUrl }),
-    });
-
-    const data = await response.json();
-
-    // Check if the API returned a validation error (e.g. 422 Unprocessable Entity, or error inside 'result')
-    if (data && data.result && data.result.errors) {
-       console.error('LNK API Validation Error:', data.result.message || data.result.errors);
-       return longUrl;
-    }
-
-    if (!response.ok) {
-      console.error('Failed to shorten link via LNK API. Status:', response.status, data);
-      return longUrl;
-    }
-
-    if (data && data.result && data.result.lnk) {
-      return data.result.lnk;
-    }
-
-    console.error('Invalid response format from LNK API:', data);
-    return longUrl;
-  } catch (error) {
-    console.error('Error shortening link:', error);
-    return longUrl;
-  }
+export const getShareIdFromUrl = (): string | null => {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('s') || params.get('share');
 };
 
 /**

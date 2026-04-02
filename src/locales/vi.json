@@ -30,12 +30,15 @@
       "logout": "Đăng xuất",
       "exportDocs": "Xuất Docs",
       "openGoogleDoc": "Mở Google Doc",
-      "share": "Chia sẻ"
+      "share": "Chia sẻ",
+      "resizePanels": "Thay đổi kích thước các khung"
     },
     "status": {
       "initFailed": "Khởi tạo thất bại. Kiểm tra API Key.",
       "linkCopied": "Đã sao chép link chia sẻ!",
       "linkGeneratedError": "Lỗi tạo link.",
+       "shareNotConfigured": "Chức năng chia sẻ chưa được cấu hình.",
+       "shareTooLarge": "Tài liệu quá lớn để chia sẻ.",
       "loggedOut": "Đã đăng xuất",
       "preparingExport": "Đang chuẩn bị xuất...",
       "processingExport": "Đang chụp biểu đồ & Tạo Doc...",
@@ -45,7 +48,17 @@
       "saved": "Đã lưu!",
       "saveFailed": "Lưu thất bại",
       "markdownFile": "Tập tin Markdown",
-      "generatingLink": "Đang tạo link rút gọn..."
+      "generatingLink": "Đang tạo link chia sẻ..."
+    },
+    "share": {
+      "loadingTitle": "Đang tải tài liệu được chia sẻ...",
+       "loadingMessage": "Đang lấy nội dung chia sẻ.",
+      "expiredTitle": "Link này đã hết hạn",
+      "expiredMessage": "Nội dung chia sẻ sẽ bị ẩn sau 1 ngày kể từ lần xem đầu tiên.",
+      "notFoundTitle": "Không tìm thấy link",
+      "notFoundMessage": "Tài liệu chia sẻ đã bị xoá hoặc link không hợp lệ.",
+      "errorTitle": "Không thể tải link chia sẻ",
+       "errorMessage": "Hãy kiểm tra cấu hình chia sẻ rồi thử lại."
     },
     "editor": {
       "placeholder": "Nhập markdown của bạn ở đây..."
